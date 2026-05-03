@@ -25,12 +25,11 @@ jobs:
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Install Vulkan SDK
-        uses: humbletim/setup-vulkan-sdk@v2.1.0
-        with:
-          vulkan-query-version: 1.3.x
-          vulkan-components: Vulkan-Headers, Glslang
-          vulkan-use-cache: true
+      - name: Setup Vulkan SDK
+        run: |
+          $sdkPath = Get-ChildItem "C:\VulkanSDK" -Directory | Sort-Object Name -Descending | Select-Object -First 1
+          echo "VULKAN_SDK=$($sdkPath.FullName)" >> $env:GITHUB_ENV
+          echo "Using Vulkan SDK: $($sdkPath.FullName)"
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4

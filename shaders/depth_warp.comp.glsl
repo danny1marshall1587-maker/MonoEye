@@ -29,7 +29,7 @@ layout(push_constant) uniform PushConstants {
 } pc;
 
 // Shared between invocations for temporal filtering
-layout(rgba8) uniform image2D previousFrame;
+layout(binding = 3, set = 0, rgba8) uniform image2D previousFrame;
 
 void main() {
     ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.xy);
