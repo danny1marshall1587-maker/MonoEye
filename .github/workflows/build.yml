@@ -12,6 +12,9 @@ on:
 env:
   BUILD_TYPE: Release
 
+permissions:
+  contents: write
+
 jobs:
   build-windows:
     name: Windows x64 (MSVC)
