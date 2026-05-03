@@ -65,18 +65,47 @@ extern "C" XrResult monoeye_xrReleaseSwapchainImage(
     const XrSwapchainImageReleaseInfo* releaseInfo
 );
 
-// Vulkan-specific hooks
 extern "C" XrResult monoeye_xrGetVulkanGraphicsRequirements2KHR(
     XrInstance instance,
     XrSystemId systemId,
     XrGraphicsRequirementsVulkan2KHR* graphicsRequirements
-);
+) {
+    monoeye::XrGeneratedDispatchTable* dispatch = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(monoeye::g_instance_dispatch_mutex);
+        auto it = monoeye::g_instance_dispatch_map.find(instance);
+        if (it != monoeye::g_instance_dispatch_map.end()) {
+            dispatch = it->second;
+        }
+    }
+
+    if (!dispatch || !dispatch->GetVulkanGraphicsRequirements2KHR) {
+        return XR_ERROR_RUNTIME_FAILURE;
+    }
+
+    return ((PFN_xrGetVulkanGraphicsRequirements2KHR)dispatch->GetVulkanGraphicsRequirements2KHR)(instance, systemId, graphicsRequirements);
+}
 
 extern "C" XrResult monoeye_xrGetVulkanGraphicsDevice2KHR(
     XrInstance instance,
     const XrGraphicsBindingVulkan2KHR* graphicsBinding,
     VkPhysicalDevice* vkPhysicalDevice
-);
+) {
+    monoeye::XrGeneratedDispatchTable* dispatch = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(monoeye::g_instance_dispatch_mutex);
+        auto it = monoeye::g_instance_dispatch_map.find(instance);
+        if (it != monoeye::g_instance_dispatch_map.end()) {
+            dispatch = it->second;
+        }
+    }
+
+    if (!dispatch || !dispatch->GetVulkanGraphicsDevice2KHR) {
+        return XR_ERROR_RUNTIME_FAILURE;
+    }
+
+    return ((PFN_xrGetVulkanGraphicsDevice2KHR)dispatch->GetVulkanGraphicsDevice2KHR)(instance, graphicsBinding, vkPhysicalDevice);
+}
 
 namespace monoeye {
 

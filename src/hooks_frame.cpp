@@ -20,7 +20,7 @@ static std::mutex s_frame_mutex;
 static XrFrameState s_last_frame_state = {};
 static bool s_frame_state_valid = false;
 
-XrResult monoeye_xrBeginFrame(
+extern "C" XrResult monoeye_xrBeginFrame(
     XrSession session,
     const XrFrameBeginInfo* frameBeginInfo
 ) {
@@ -60,7 +60,7 @@ XrResult monoeye_xrBeginFrame(
     return ((PFN_xrBeginFrame)dispatch->BeginFrame)(session, frameBeginInfo);
 }
 
-XrResult monoeye_xrEndFrame(
+extern "C" XrResult monoeye_xrEndFrame(
     XrSession session,
     const XrFrameEndInfo* frameEndInfo
 ) {

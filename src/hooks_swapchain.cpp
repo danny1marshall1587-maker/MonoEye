@@ -14,10 +14,10 @@
 namespace monoeye {
 
 // Track which instance owns each session
-static std::mutex s_session_map_mutex;
-static std::unordered_map<XrSession, XrInstance> s_session_map;
+std::mutex s_session_map_mutex;
+std::unordered_map<XrSession, XrInstance> s_session_map;
 
-XrResult monoeye_xrCreateSwapchain(
+extern "C" XrResult monoeye_xrCreateSwapchain(
     XrSession session,
     const XrSwapchainCreateInfo* createInfo,
     XrSwapchain* swapchain
@@ -91,7 +91,7 @@ XrResult monoeye_xrCreateSwapchain(
     return result;
 }
 
-XrResult monoeye_xrDestroySwapchain(XrSwapchain swapchain) {
+extern "C" XrResult monoeye_xrDestroySwapchain(XrSwapchain swapchain) {
     MONOEYE_LOG("xrDestroySwapchain: %p", (void*)(uintptr_t)swapchain);
 
     SwapchainTracker::get_instance().untrack_swapchain(swapchain);
@@ -115,7 +115,7 @@ XrResult monoeye_xrDestroySwapchain(XrSwapchain swapchain) {
     return ((PFN_xrDestroySwapchain)dispatch->DestroySwapchain)(swapchain);
 }
 
-XrResult monoeye_xrEnumerateSwapchainImages(
+extern "C" XrResult monoeye_xrEnumerateSwapchainImages(
     XrSwapchain swapchain,
     uint32_t swapchainImageCapacityInput,
     uint32_t* swapchainImageCountOutput,
@@ -143,7 +143,7 @@ XrResult monoeye_xrEnumerateSwapchainImages(
     );
 }
 
-XrResult monoeye_xrAcquireSwapchainImage(
+extern "C" XrResult monoeye_xrAcquireSwapchainImage(
     XrSwapchain swapchain,
     const XrSwapchainImageAcquireInfo* acquireInfo,
     uint32_t* index
@@ -166,7 +166,7 @@ XrResult monoeye_xrAcquireSwapchainImage(
     return ((PFN_xrAcquireSwapchainImage)dispatch->AcquireSwapchainImage)(swapchain, acquireInfo, index);
 }
 
-XrResult monoeye_xrWaitSwapchainImage(
+extern "C" XrResult monoeye_xrWaitSwapchainImage(
     XrSwapchain swapchain,
     const XrSwapchainImageWaitInfo* waitInfo
 ) {
@@ -188,7 +188,7 @@ XrResult monoeye_xrWaitSwapchainImage(
     return ((PFN_xrWaitSwapchainImage)dispatch->WaitSwapchainImage)(swapchain, waitInfo);
 }
 
-XrResult monoeye_xrReleaseSwapchainImage(
+extern "C" XrResult monoeye_xrReleaseSwapchainImage(
     XrSwapchain swapchain,
     const XrSwapchainImageReleaseInfo* releaseInfo
 ) {

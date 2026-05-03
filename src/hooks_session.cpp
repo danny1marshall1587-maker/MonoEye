@@ -17,7 +17,7 @@ namespace monoeye {
 extern std::mutex s_session_map_mutex;
 extern std::unordered_map<XrSession, XrInstance> s_session_map;
 
-XrResult monoeye_xrCreateSession(
+extern "C" XrResult monoeye_xrCreateSession(
     XrInstance instance,
     const XrSessionCreateInfo* createInfo,
     XrSession* session
@@ -87,7 +87,7 @@ XrResult monoeye_xrCreateSession(
     return XR_SUCCESS;
 }
 
-XrResult monoeye_xrDestroySession(XrSession session) {
+extern "C" XrResult monoeye_xrDestroySession(XrSession session) {
     MONOEYE_LOG("xrDestroySession called: %p", (void*)(uintptr_t)session);
 
     // Find the instance for this session
