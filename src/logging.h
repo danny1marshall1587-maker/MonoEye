@@ -30,13 +30,13 @@ inline bool log_enabled(LogLevel level) {
 
 // Logging macros with file/line info
 #define MONOEYE_LOG(fmt, ...) \
-    monoeye::log(monoeye::LOG_INFO, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+    monoeye::monoeye_log(monoeye::LOG_INFO, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
 
 #define MONOEYE_LOG_DEBUG(fmt, ...) \
-    monoeye::log(monoeye::LOG_DEBUG, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+    monoeye::monoeye_log(monoeye::LOG_DEBUG, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
 
 #define MONOEYE_LOG_WARN(fmt, ...) \
-    monoeye::log(monoeye::LOG_WARN, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+    monoeye::monoeye_log(monoeye::LOG_WARN, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
 
 #define MONOEYE_LOG_ERROR(fmt, ...) \
-    monoeye::log(monoeye::LOG_ERROR, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+    monoeye::monoeye_log(monoeye::LOG_ERROR, __FILE__, __LINE__, fmt, ##__VA_ARGS__)

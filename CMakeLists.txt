@@ -81,6 +81,7 @@ if(MONOEYE_EMBED_SHADERS)
                 OUTPUT ${SPIRV_OUTPUT}
                 COMMAND ${SHADER_COMPILER}
                     --target-env=vulkan1.2
+                    -fshader-stage=compute
                     -o ${SPIRV_OUTPUT}
                     ${SHADER_SRC}
                 DEPENDS ${SHADER_SRC}
