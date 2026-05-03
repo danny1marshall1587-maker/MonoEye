@@ -3,9 +3,14 @@
 
 #pragma once
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 #include <vulkan/vulkan.h>
 
 #include <openxr/openxr.h>
+#include <openxr/openxr_platform.h>
 
 #include <mutex>
 #include <vector>

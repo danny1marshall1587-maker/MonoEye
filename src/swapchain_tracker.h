@@ -4,12 +4,7 @@
 #pragma once
 
 #include <openxr/openxr.h>
-
-#ifdef _WIN32
-#include <vulkan/vulkan_win32.h>
-#else
-#include <vulkan/vulkan_xcb.h>
-#endif
+#include <openxr/openxr_platform.h>
 
 #include <vulkan/vulkan.h>
 

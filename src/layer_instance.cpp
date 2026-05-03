@@ -109,7 +109,7 @@ XrResult LayerXrDestroyInstance(XrInstance instance) {
     if (nextDispatch) {
         // Call down to destroy the instance
         if (nextDispatch->DestroyInstance) {
-            nextDispatch->DestroyInstance(instance);
+            ((PFN_xrDestroyInstance)nextDispatch->DestroyInstance)(instance);
         }
 
         // Clean up the dispatch table

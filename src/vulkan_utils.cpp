@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "logging.h"
+#ifdef _WIN32
+#include <windows.h>
+#endif
 #include <vulkan/vulkan.h>
 
 #include <cstring>
