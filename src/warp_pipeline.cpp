@@ -247,8 +247,8 @@ VkResult WarpPipeline::create_compute_pipeline() {
 #ifdef MONOEYE_EMBED_SHADERS
     VkShaderModuleCreateInfo shaderInfo = {};
     shaderInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    shaderInfo.codeSize = depth_warp_comp_size;
-    shaderInfo.pCode = reinterpret_cast<const uint32_t*>(depth_warp_comp_data);
+    shaderInfo.codeSize = depth_warp_size;
+    shaderInfo.pCode = reinterpret_cast<const uint32_t*>(depth_warp_data);
 
     VkShaderModule shaderModule;
     result = vkCreateShaderModule(m_vkDevice, &shaderInfo, nullptr, &shaderModule);

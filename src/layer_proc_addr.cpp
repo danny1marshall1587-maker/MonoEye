@@ -4,8 +4,11 @@
 #include "layer.h"
 #include "logging.h"
 #include "dispatch_table.h"
-#include <openxr/openxr_platform.h>
+#ifdef _WIN32
+#include <windows.h>
+#endif
 #include <vulkan/vulkan.h>
+#include <openxr/openxr_platform.h>
 #include <cstring>
 
 // Forward declarations of our hooked functions

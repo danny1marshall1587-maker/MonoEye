@@ -73,6 +73,7 @@ def generate_dispatch_header(commands, output_path):
 #pragma once
 
 #include <openxr/openxr.h>
+#include <openxr/openxr_platform.h>
 
 namespace monoeye {
 

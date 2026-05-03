@@ -107,9 +107,7 @@ void SwapchainTracker::analyze_frame_views(
                 // Find the color swapchain
                 for (auto& pair : m_swapchains) {
                     SwapchainImageInfo& info = pair.second;
-                    if (info.swapchain == view.subImage.swapchainHandle && !info.isDepth) {
-                        // Determine which eye based on view configuration
-                        // In standard OpenXR, view 0 = left, view 1 = right
+                    if (info.swapchain == view.subImage.swapchain && !info.isDepth) {
                         if (v == 0) {
                             info.isLeftEye = true;
                             m_assigned_eye[info.swapchain] = true;
@@ -118,11 +116,17 @@ void SwapchainTracker::analyze_frame_views(
                             m_assigned_eye[info.swapchain] = true;
                         }
                     }
+                }
 
-                    // Find the associated depth swapchain
-                    if (view.depth.subImage.swapchainHandle != XR_NULL_HANDLE) {
+                // Find the associated depth swapchain via the depth info extension
+                const XrBaseInStructure* depthHeader = reinterpret_cast<const XrBaseInStructure*>(view.next);
+                while (depthHeader) {
+                    if (depthHeader->type == XR_TYPE_COMPOSITION_LAYER_DEPTH_INFO_KHR) {
+                        const XrCompositionLayerDepthInfoKHR* depthInfo =
+                            reinterpret_cast<const XrCompositionLayerDepthInfoKHR*>(depthHeader);
+                        XrSwapchain depthSwapchain = depthInfo->subImage.swapchain;
                         for (auto& dpair : m_swapchains) {
-                            if (dpair.second.swapchain == view.depth.subImage.swapchainHandle) {
+                            if (dpair.second.swapchain == depthSwapchain) {
                                 dpair.second.isDepth = true;
                                 if (v == 0) {
                                     dpair.second.isLeftEye = true;
@@ -131,7 +135,9 @@ void SwapchainTracker::analyze_frame_views(
                                 }
                             }
                         }
+                        break;
                     }
+                    depthHeader = depthHeader->next;
                 }
             }
         }

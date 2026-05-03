@@ -3,10 +3,16 @@
 
 #pragma once
 
-#include <openxr/openxr.h>
-#include <openxr/openxr_platform.h>
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
 
+#include <openxr/openxr.h>
 #include <vulkan/vulkan.h>
+#include <openxr/openxr_platform.h>
 
 #include <mutex>
 #include <vector>
