@@ -1,0 +1,45 @@
+# Build outputs
+build/
+build-*/
+bin/
+obj/
+*.dll
+*.so
+*.dylib
+*.exe
+*.pdb
+*.ilk
+*.exp
+*.lib
+
+# IDE
+.vs/
+.vscode/
+*.suo
+*.sln
+*.user
+*.userprefs
+*.csproj.user
+
+# CMake
+CMakeLists.txt.user
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+CMakeFiles/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Switcher publish output
+switcher-output/
+
+# Release packages
+*.zip
+release/
