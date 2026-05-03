@@ -171,6 +171,7 @@ target_link_libraries(monoeye PRIVATE
 
 target_compile_definitions(monoeye PRIVATE
     MONOEYE_EXPORTS
+    XR_USE_GRAPHICS_API_VULKAN
     $<$<PLATFORM_ID:Windows>:_CRT_SECURE_NO_WARNINGS>
     $<$<PLATFORM_ID:Windows>:NOMINMAX>
     $<$<PLATFORM_ID:Windows>:VK_USE_PLATFORM_WIN32_KHR>
