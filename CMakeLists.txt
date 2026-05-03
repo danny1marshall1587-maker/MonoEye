@@ -49,9 +49,17 @@ endif()
 
 # GLSL to SPIR-V compilation
 if(MONOEYE_EMBED_SHADERS)
-    find_program(GLSLC_EXECUTABLE glslc HINTS "${Vulkan_GLSLC_EXECUTABLE}")
-    if(NOT GLSLC_EXECUTABLE)
-        message(FATAL_ERROR "glslc not found. Ensure Vulkan SDK is installed and VULKAN_SDK is set.")
+    find_program(GLSLLANG_EXECUTABLE NAMES glslangValidator)
+    find_program(GLSLC_EXECUTABLE NAMES glslc)
+
+    if(GLSLC_EXECUTABLE)
+        set(SHADER_COMPILER ${GLSLC_EXECUTABLE})
+        set(SHADER_COMPILER_NAME "glslc")
+    elseif(GLSLLANG_EXECUTABLE)
+        set(SHADER_COMPILER ${GLSLLANG_EXECUTABLE})
+        set(SHADER_COMPILER_NAME "glslangValidator")
+    else()
+        message(FATAL_ERROR "Neither glslc nor glslangValidator found. Ensure Vulkan SDK or glslang-tools is installed.")
     endif()
 
     file(GLOB SHADER_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/shaders/*.comp.glsl")
@@ -62,15 +70,28 @@ if(MONOEYE_EMBED_SHADERS)
         set(SPIRV_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${SHADER_NAME}.comp.spv")
         set(HEADER_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${SHADER_NAME}.h")
 
-        add_custom_command(
-            OUTPUT ${SPIRV_OUTPUT}
-            COMMAND ${GLSLC_EXECUTABLE}
-                --target-env=vulkan1.2
-                -o ${SPIRV_OUTPUT}
-                ${SHADER_SRC}
-            DEPENDS ${SHADER_SRC}
-            COMMENT "Compiling shader ${SHADER_NAME}.comp.glsl"
-        )
+        if(SHADER_COMPILER_NAME STREQUAL "glslc")
+            add_custom_command(
+                OUTPUT ${SPIRV_OUTPUT}
+                COMMAND ${SHADER_COMPILER}
+                    --target-env=vulkan1.2
+                    -o ${SPIRV_OUTPUT}
+                    ${SHADER_SRC}
+                DEPENDS ${SHADER_SRC}
+                COMMENT "Compiling shader ${SHADER_NAME}.comp.glsl with glslc"
+            )
+        else()
+            add_custom_command(
+                OUTPUT ${SPIRV_OUTPUT}
+                COMMAND ${SHADER_COMPILER}
+                    -V
+                    --target-env vulkan1.2
+                    -o ${SPIRV_OUTPUT}
+                    ${SHADER_SRC}
+                DEPENDS ${SHADER_SRC}
+                COMMENT "Compiling shader ${SHADER_NAME}.comp.glsl with glslangValidator"
+            )
+        endif()
 
         add_custom_command(
             OUTPUT ${HEADER_OUTPUT}
