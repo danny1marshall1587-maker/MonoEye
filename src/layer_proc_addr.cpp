@@ -68,7 +68,7 @@ extern "C" XrResult monoeye_xrReleaseSwapchainImage(
 extern "C" XrResult monoeye_xrGetVulkanGraphicsRequirements2KHR(
     XrInstance instance,
     XrSystemId systemId,
-    XrGraphicsRequirementsVulkan2KHR* graphicsRequirements
+    XrGraphicsRequirementsVulkanKHR* graphicsRequirements
 ) {
     monoeye::XrGeneratedDispatchTable* dispatch = nullptr;
     {
@@ -79,16 +79,16 @@ extern "C" XrResult monoeye_xrGetVulkanGraphicsRequirements2KHR(
         }
     }
 
-    if (!dispatch || !dispatch->GetVulkanGraphicsRequirements2KHR) {
+    if (!dispatch || !dispatch->GetVulkanGraphicsRequirementsKHR) {
         return XR_ERROR_RUNTIME_FAILURE;
     }
 
-    return ((PFN_xrGetVulkanGraphicsRequirements2KHR)dispatch->GetVulkanGraphicsRequirements2KHR)(instance, systemId, graphicsRequirements);
+    return ((PFN_xrGetVulkanGraphicsRequirements2KHR)dispatch->GetVulkanGraphicsRequirementsKHR)(instance, systemId, graphicsRequirements);
 }
 
 extern "C" XrResult monoeye_xrGetVulkanGraphicsDevice2KHR(
     XrInstance instance,
-    const XrGraphicsBindingVulkan2KHR* graphicsBinding,
+    const XrVulkanGraphicsDeviceGetInfoKHR* getInfo,
     VkPhysicalDevice* vkPhysicalDevice
 ) {
     monoeye::XrGeneratedDispatchTable* dispatch = nullptr;
@@ -104,7 +104,7 @@ extern "C" XrResult monoeye_xrGetVulkanGraphicsDevice2KHR(
         return XR_ERROR_RUNTIME_FAILURE;
     }
 
-    return ((PFN_xrGetVulkanGraphicsDevice2KHR)dispatch->GetVulkanGraphicsDevice2KHR)(instance, graphicsBinding, vkPhysicalDevice);
+    return ((PFN_xrGetVulkanGraphicsDevice2KHR)dispatch->GetVulkanGraphicsDevice2KHR)(instance, getInfo, vkPhysicalDevice);
 }
 
 namespace monoeye {
