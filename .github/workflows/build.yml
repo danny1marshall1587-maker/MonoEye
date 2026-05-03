@@ -98,7 +98,8 @@ jobs:
             python3 \
             libvulkan-dev \
             glslang-tools \
-            vulkan-validationlayers
+            vulkan-validationlayers \
+            zip
 
       - name: Setup Python
         uses: actions/setup-python@v5
