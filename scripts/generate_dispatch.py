@@ -128,7 +128,7 @@ void GeneratedXrPopulateDispatchTable(
         for cmd_name, cmd_info in sorted(commands.items()):
             member_name = cmd_name[2:]
             f.write(f'\n    get_instance_proc_addr(instance, "{cmd_name}", &proc_addr);\n')
-            f.write(f"    dispatch_table->{member_name} = reinterpret_cast<{cmd_name}>(proc_addr);\n")
+            f.write(f"    dispatch_table->{member_name} = reinterpret_cast<PFN_{cmd_name}>(proc_addr);\n")
 
         f.write("""
 }
