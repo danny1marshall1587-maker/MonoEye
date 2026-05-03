@@ -4,7 +4,6 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
-    <ApplicationIcon>Resources\monoeye.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <SelfContained>false</SelfContained>
     <PublishSingleFile>true</PublishSingleFile>
