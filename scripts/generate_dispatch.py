@@ -80,15 +80,21 @@ def generate_dispatch_header(commands, output_path):
 
 namespace monoeye {
 
+// Generated function pointer typedefs (avoids SDK version mismatches)
+""")
+
+        for cmd_name, cmd_info in sorted(commands.items()):
+            ret = cmd_info['return_type']
+            params_str = ', '.join(f'{p[0]} {p[1]}' for p in cmd_info['params']) if cmd_info['params'] else 'void'
+            f.write(f"typedef {ret} (XRAPI_PTR *PFN_{cmd_name})({params_str});\n")
+
+        f.write("""
 struct XrGeneratedDispatchTable {
 """)
 
         for cmd_name, cmd_info in sorted(commands.items()):
-            # Build function pointer type name
-            fp_type = f"PFN_{cmd_name}"
             member_name = cmd_name[2:]  # Remove xr prefix
-
-            f.write(f"    {fp_type} {member_name} = nullptr;\n")
+            f.write(f"    PFN_{cmd_name} {member_name} = nullptr;\n")
 
         f.write("""};
 

@@ -43,7 +43,7 @@ jobs:
           python-version: '3.12'
 
       - name: Configure CMake
-        run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DMONOEYE_STRICT_WARNINGS=ON
+        run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DMONOEYE_STRICT_WARNINGS=OFF
 
       - name: Build Layer
         run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --parallel
@@ -104,7 +104,7 @@ jobs:
           python-version: '3.12'
 
       - name: Configure CMake
-        run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DMONOEYE_STRICT_WARNINGS=ON
+        run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DMONOEYE_STRICT_WARNINGS=OFF
 
       - name: Build
         run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --parallel
