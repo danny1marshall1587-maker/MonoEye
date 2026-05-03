@@ -5,8 +5,8 @@
 #include "logging.h"
 #include "dispatch_table.h"
 #include "swapchain_tracker.h"
-#include <openxr/openxr_platform.h>
 #include <vulkan/vulkan.h>
+#include <openxr/openxr_platform.h>
 
 #include <mutex>
 #include <vector>

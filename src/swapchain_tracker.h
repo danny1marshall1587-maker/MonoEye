@@ -10,8 +10,8 @@
 #include <windows.h>
 #endif
 
-#include <openxr/openxr.h>
 #include <vulkan/vulkan.h>
+#include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
 
 #include <mutex>

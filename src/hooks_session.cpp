@@ -7,8 +7,8 @@
 #include "swapchain_tracker.h"
 #include "warp_pipeline.h"
 #include "config.h"
-#include <openxr/openxr_platform.h>
 #include <vulkan/vulkan.h>
+#include <openxr/openxr_platform.h>
 
 #include <mutex>
 
