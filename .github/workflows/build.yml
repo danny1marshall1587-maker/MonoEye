@@ -3,6 +3,7 @@ name: Build MonoEye
 on:
   push:
     branches: [ main, master, develop ]
+    tags: [ 'v*' ]
   pull_request:
     branches: [ main, master ]
   release:
