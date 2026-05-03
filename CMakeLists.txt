@@ -49,8 +49,14 @@ endif()
 
 # GLSL to SPIR-V compilation
 if(MONOEYE_EMBED_SHADERS)
-    find_program(GLSLLANG_EXECUTABLE NAMES glslangValidator)
-    find_program(GLSLC_EXECUTABLE NAMES glslc)
+    # Search paths for shader compilers
+    set(SHADER_COMPILER_HINTS "")
+    if(DEFINED ENV{VULKAN_SDK})
+        list(APPEND SHADER_COMPILER_HINTS "$ENV{VULKAN_SDK}/Bin")
+    endif()
+
+    find_program(GLSLLANG_EXECUTABLE NAMES glslangValidator HINTS ${SHADER_COMPILER_HINTS})
+    find_program(GLSLC_EXECUTABLE NAMES glslc HINTS ${SHADER_COMPILER_HINTS})
 
     if(GLSLC_EXECUTABLE)
         set(SHADER_COMPILER ${GLSLC_EXECUTABLE})

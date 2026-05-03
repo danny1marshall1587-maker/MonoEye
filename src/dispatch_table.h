@@ -8,11 +8,10 @@
 #include <unordered_map>
 #include <mutex>
 
-namespace monoeye {
+// Include the generated dispatch table definition
+#include "xr_generated_dispatch_table.h"
 
-// Forward declare the generated dispatch table structure
-// The actual structure is defined in xr_generated_dispatch_table.h
-struct XrGeneratedDispatchTable;
+namespace monoeye {
 
 // Global dispatch table map: instance -> dispatch table
 extern std::unordered_map<XrInstance, XrGeneratedDispatchTable*> g_instance_dispatch_map;
