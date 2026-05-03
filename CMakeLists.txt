@@ -170,10 +170,10 @@ target_link_libraries(monoeye PRIVATE
 )
 
 target_compile_definitions(monoeye PRIVATE
+    MONOEYE_EXPORTS
     $<$<PLATFORM_ID:Windows>:_CRT_SECURE_NO_WARNINGS>
     $<$<PLATFORM_ID:Windows>:NOMINMAX>
     $<$<PLATFORM_ID:Windows>:VK_USE_PLATFORM_WIN32_KHR>
-    $<$<PLATFORM_ID:Linux>:VK_USE_PLATFORM_XCB_KHR>
 )
 
 # Windows-specific settings

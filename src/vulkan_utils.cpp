@@ -5,6 +5,7 @@
 #include <vulkan/vulkan.h>
 
 #include <cstring>
+#include <vector>
 
 namespace monoeye {
 

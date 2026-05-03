@@ -4,6 +4,8 @@
 #include "layer.h"
 #include "logging.h"
 #include "dispatch_table.h"
+#include <openxr/openxr_platform.h>
+#include <vulkan/vulkan.h>
 #include <cstring>
 
 // Forward declarations of our hooked functions

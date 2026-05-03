@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Generates OpenXR dispatch table header and source from xr.xml.
-Based on the pattern used in OpenXR-SDK-Source but simplified for MonoEye.
+Uses PFN_xrVoidFunction for storage to avoid SDK version conflicts.
 """
 
 import argparse
@@ -16,7 +16,6 @@ def parse_commands(xml_path):
     commands = {}
 
     for cmd_elem in root.findall('.//commands/command'):
-        # Skip aliases
         if cmd_elem.get('alias'):
             continue
 
@@ -30,7 +29,6 @@ def parse_commands(xml_path):
             continue
 
         ret_type = ret_type_elem.text or 'void'
-        # Get full type text including any pointer asterisks
         ret_text = proto.text or ''
         if ret_type_elem.tail:
             ret_text += ret_type_elem.tail
@@ -42,7 +40,6 @@ def parse_commands(xml_path):
         if not cmd_name:
             continue
 
-        # Parse parameters
         params = []
         for param_elem in proto.findall('param'):
             type_elem = param_elem.find('type')
@@ -50,7 +47,6 @@ def parse_commands(xml_path):
             if type_elem is None or name_param_elem is None:
                 continue
 
-            # Get full type including pointers
             param_type = (param_elem.text or '') + (type_elem.text or '') + (type_elem.tail or '')
             param_type = param_type.strip()
             param_name = name_param_elem.text or ''
@@ -80,23 +76,19 @@ def generate_dispatch_header(commands, output_path):
 
 namespace monoeye {
 
-// Generated function pointer typedefs (avoids SDK version mismatches)
-""")
-
-        for cmd_name, cmd_info in sorted(commands.items()):
-            ret = cmd_info['return_type']
-            params_str = ', '.join(f'{p[0]} {p[1]}' for p in cmd_info['params']) if cmd_info['params'] else 'void'
-            f.write(f"typedef {ret} (XRAPI_PTR *PFN_{cmd_name})({params_str});\n")
-
-        f.write("""
 struct XrGeneratedDispatchTable {
 """)
 
         for cmd_name, cmd_info in sorted(commands.items()):
-            member_name = cmd_name[2:]  # Remove xr prefix
-            f.write(f"    PFN_{cmd_name} {member_name} = nullptr;\n")
+            member_name = cmd_name[2:]
+            f.write(f"    PFN_xrVoidFunction {member_name} = nullptr;\n")
 
         f.write("""};
+
+// Helper macro to call a dispatch function with proper casting
+// Usage: MONOEYE_CALL_DISPATCH(dispatch, xrBeginFrame, (session, &frameBeginInfo))
+#define MONOEYE_CALL_DISPATCH(dispatch, fn, args) \\
+    ((PFN_##fn)(dispatch)->##fn##_2)(args)
 
 } // namespace monoeye
 """)
@@ -134,7 +126,7 @@ void GeneratedXrPopulateDispatchTable(
         for cmd_name, cmd_info in sorted(commands.items()):
             member_name = cmd_name[2:]
             f.write(f'\n    get_instance_proc_addr(instance, "{cmd_name}", &proc_addr);\n')
-            f.write(f"    dispatch_table->{member_name} = reinterpret_cast<PFN_{cmd_name}>(proc_addr);\n")
+            f.write(f"    dispatch_table->{member_name} = proc_addr;\n")
 
         f.write("""
 }

@@ -7,6 +7,8 @@
 #include "swapchain_tracker.h"
 #include "warp_pipeline.h"
 #include "config.h"
+#include <openxr/openxr_platform.h>
+#include <vulkan/vulkan.h>
 
 #include <mutex>
 
@@ -37,7 +39,7 @@ XrResult monoeye_xrCreateSession(
     }
 
     // Call down to create the session
-    XrResult result = dispatch->CreateSession(instance, createInfo, session);
+    XrResult result = ((PFN_xrCreateSession)dispatch->CreateSession)(instance, createInfo, session);
 
     if (result != XR_SUCCESS) {
         MONOEYE_LOG_ERROR("xrCreateSession failed: %d", result);
@@ -119,7 +121,7 @@ XrResult monoeye_xrDestroySession(XrSession session) {
         return XR_ERROR_RUNTIME_FAILURE;
     }
 
-    return dispatch->DestroySession(session);
+    return ((PFN_xrDestroySession)dispatch->DestroySession)(session);
 }
 
 } // namespace monoeye

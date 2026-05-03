@@ -51,12 +51,11 @@ XrResult monoeye_xrCreateSwapchain(
         return XR_ERROR_RUNTIME_FAILURE;
     }
 
-    XrResult result = dispatch->CreateSwapchain(session, createInfo, swapchain);
+    XrResult result = ((PFN_xrCreateSwapchain)dispatch->CreateSwapchain)(session, createInfo, swapchain);
 
     if (result == XR_SUCCESS) {
-        // Enumerate swapchain images to track them
         uint32_t imageCount = 0;
-        dispatch->EnumerateSwapchainImages(*swapchain, 0, &imageCount, nullptr);
+        ((PFN_xrEnumerateSwapchainImages)dispatch->EnumerateSwapchainImages)(*swapchain, 0, &imageCount, nullptr);
 
         if (imageCount > 0) {
             // Allocate Vulkan image array
@@ -72,7 +71,7 @@ XrResult monoeye_xrCreateSwapchain(
             }
 
             uint32_t actualCount = 0;
-            dispatch->EnumerateSwapchainImages(
+            ((PFN_xrEnumerateSwapchainImages)dispatch->EnumerateSwapchainImages)(
                 *swapchain,
                 imageCount,
                 &actualCount,
@@ -110,7 +109,7 @@ XrResult monoeye_xrDestroySwapchain(XrSwapchain swapchain) {
         return XR_ERROR_RUNTIME_FAILURE;
     }
 
-    return dispatch->DestroySwapchain(swapchain);
+    return ((PFN_xrDestroySwapchain)dispatch->DestroySwapchain)(swapchain);
 }
 
 XrResult monoeye_xrEnumerateSwapchainImages(
@@ -135,7 +134,7 @@ XrResult monoeye_xrEnumerateSwapchainImages(
         return XR_ERROR_RUNTIME_FAILURE;
     }
 
-    return dispatch->EnumerateSwapchainImages(
+    return ((PFN_xrEnumerateSwapchainImages)dispatch->EnumerateSwapchainImages)(
         swapchain, swapchainImageCapacityInput,
         swapchainImageCountOutput, swapchainImages
     );
@@ -161,7 +160,7 @@ XrResult monoeye_xrAcquireSwapchainImage(
         return XR_ERROR_RUNTIME_FAILURE;
     }
 
-    return dispatch->AcquireSwapchainImage(swapchain, acquireInfo, index);
+    return ((PFN_xrAcquireSwapchainImage)dispatch->AcquireSwapchainImage)(swapchain, acquireInfo, index);
 }
 
 XrResult monoeye_xrWaitSwapchainImage(
@@ -183,7 +182,7 @@ XrResult monoeye_xrWaitSwapchainImage(
         return XR_ERROR_RUNTIME_FAILURE;
     }
 
-    return dispatch->WaitSwapchainImage(swapchain, waitInfo);
+    return ((PFN_xrWaitSwapchainImage)dispatch->WaitSwapchainImage)(swapchain, waitInfo);
 }
 
 XrResult monoeye_xrReleaseSwapchainImage(
@@ -205,7 +204,7 @@ XrResult monoeye_xrReleaseSwapchainImage(
         return XR_ERROR_RUNTIME_FAILURE;
     }
 
-    return dispatch->ReleaseSwapchainImage(swapchain, releaseInfo);
+    return ((PFN_xrReleaseSwapchainImage)dispatch->ReleaseSwapchainImage)(swapchain, releaseInfo);
 }
 
 } // namespace monoeye

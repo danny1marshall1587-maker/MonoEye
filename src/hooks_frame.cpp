@@ -57,7 +57,7 @@ XrResult monoeye_xrBeginFrame(
     // Wait for any pending warp operations to complete
     WarpPipeline::get_instance().wait_for_completion();
 
-    return dispatch->BeginFrame(session, frameBeginInfo);
+    return ((PFN_xrBeginFrame)dispatch->BeginFrame)(session, frameBeginInfo);
 }
 
 XrResult monoeye_xrEndFrame(
@@ -94,7 +94,7 @@ XrResult monoeye_xrEndFrame(
             return XR_ERROR_RUNTIME_FAILURE;
         }
 
-        return dispatch->EndFrame(session, frameEndInfo);
+        return ((PFN_xrEndFrame)dispatch->EndFrame)(session, frameEndInfo);
     }
 
     // --- MONOEYE DEPTH WARP PIPELINE ---
@@ -177,7 +177,7 @@ XrResult monoeye_xrEndFrame(
         return XR_ERROR_RUNTIME_FAILURE;
     }
 
-    return dispatch->EndFrame(session, frameEndInfo);
+    return ((PFN_xrEndFrame)dispatch->EndFrame)(session, frameEndInfo);
 }
 
 } // namespace monoeye
