@@ -58,12 +58,8 @@ XrResult monoeye_xrCreateSession(
     const Config& config = get_config();
     if (config.enabled && !config.bypass_mode) {
         if (createInfo && createInfo->next) {
-            // Check if this is a Vulkan session
-            const XrGraphicsBindingVulkan2KHR* vkBinding =
-                reinterpret_cast<const XrGraphicsBindingVulkan2KHR*>(createInfo->next);
-
             // Walk the next chain to find the Vulkan binding
-            const XrBaseInStructure* header = createInfo->next;
+            const XrBaseInStructure* header = reinterpret_cast<const XrBaseInStructure*>(createInfo->next);
             while (header) {
                 if (header->type == XR_TYPE_GRAPHICS_BINDING_VULKAN2_KHR ||
                     header->type == XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR) {
