@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.18)
 project(MonoEye
-    VERSION 0.1.3
+    VERSION 0.2.0
     DESCRIPTION "MonoEye - Single-eye VR rendering with depth-based second eye reconstruction"
     LANGUAGES CXX
 )
