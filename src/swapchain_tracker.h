@@ -18,12 +18,10 @@
 #include <vector>
 #include <unordered_map>
 
+#include "dispatch_table.h"
+
 namespace monoeye {
 
-struct XrGeneratedDispatchTable;
-struct SwapchainImageInfo;
-
-// Swapchain image tracking info
 struct SwapchainImageInfo {
     XrSwapchain swapchain;
     XrSwapchainCreateInfo createInfo;
@@ -39,8 +37,6 @@ struct SwapchainImageInfo {
     bool isRightEye;
 };
 
-// SwapchainTracker tracks all swapchains created by the application
-// and determines which are left-eye, right-eye, or depth swapchains
 class SwapchainTracker {
 public:
     static SwapchainTracker& get_instance();
@@ -56,16 +52,13 @@ public:
 
     SwapchainImageInfo* get_info(XrSwapchain swapchain);
 
-    // Called from xrEndFrame to analyze which swapchains are used for which eye
     void analyze_frame_views(
         uint32_t layerCount,
         const XrCompositionLayerBaseHeader* const* layers
     );
 
-    // Get all tracked swapchains
     std::vector<SwapchainImageInfo*> get_all();
 
-    // Get or create a "shadow" swapchain for the right eye reconstruction
     XrSwapchain get_or_create_right_swapchain(
         XrSession session,
         const XrSwapchainCreateInfo& leftCreateInfo,
@@ -79,7 +72,7 @@ private:
 
     std::mutex m_mutex;
     std::unordered_map<XrSwapchain, SwapchainImageInfo> m_swapchains;
-    std::unordered_map<XrSession, XrSwapchain> m_right_swapchains; // One shadow per session
+    std::unordered_map<XrSession, XrSwapchain> m_right_swapchains;
     std::unordered_map<XrSwapchain, bool> m_assigned_eye;
 
     void mark_as_depth(XrSwapchain swapchain);
