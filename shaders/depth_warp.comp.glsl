@@ -118,4 +118,3 @@ void main() {
         imageStore(rightEyeOutput, pixelCoord, vec4(fillColor, 1.0));
     }
 }
-}
