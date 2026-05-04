@@ -18,6 +18,9 @@ struct Config {
     // Enable debug mode (screenshots, timing output)
     bool debug_mode = false;
 
+    // Show a small green dot in the headset to indicate MonoEye is active
+    bool show_indicator = true;
+
     // IPD override in meters (0.0 = use headset default)
     float ipd_override = 0.0f;
 

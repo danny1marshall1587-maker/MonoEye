@@ -18,14 +18,14 @@ layout(binding = 2, set = 0, rgba8) uniform writeonly image2D rightEyeOutput;
 
 // Push constants for runtime configuration
 layout(push_constant) uniform PushConstants {
-    float ipd;                // Interpupillary distance in meters (default 0.064)
+    float ipd;                // Interpupillary distance in meters
     float nearZ;              // Near clip plane distance
     float farZ;               // Far clip plane distance
-    float focalLength;        // Focal length (from projection matrix)
-    float displayTime;        // Frame display time for temporal reprojection
-    int hasDepthBuffer;       // 1 if depth buffer is available, 0 otherwise
-    int qualityMode;          // 0=fast, 1=balanced, 2=quality
-    int frameIndex;           // Frame counter for temporal filtering
+    float focalLength;        // Focal length
+    uint hasDepthBuffer;      // 1 if depth buffer is available
+    uint qualityMode;         // 0=fast, 1=balanced, 2=quality
+    uint showIndicator;       // 1 to show active indicator
+    uint frameIndex;          // Frame counter
 } pc;
 
 // Shared between invocations for temporal filtering
@@ -116,5 +116,13 @@ void main() {
         // Disocclusion zone - fill with nearest edge
         vec3 fillColor = texture(leftEyeColor, vec2(clamp(shiftedUV.x, 0.0, 1.0), uv.y)).rgb;
         imageStore(rightEyeOutput, pixelCoord, vec4(fillColor, 1.0));
+    }
+
+    // Draw indicator (small green dot in bottom-left)
+    if (pc.showIndicator == 1) {
+        float dist = distance(vec2(pixelCoord), vec2(40.0, float(imageSize.y) - 40.0));
+        if (dist < 8.0) {
+            imageStore(rightEyeOutput, pixelCoord, vec4(0.0, 1.0, 0.0, 1.0));
+        }
     }
 }

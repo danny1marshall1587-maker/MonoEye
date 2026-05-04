@@ -62,6 +62,7 @@ Config load_config() {
     config.ipd_override = get_env_float("MONOEYE_IPD_OVERRIDE", 0.0f);
     config.render_width_percent = get_env_float("MONOEYE_RENDER_WIDTH_PERCENT", 100.0f);
     config.warp_quality = get_env_int("MONOEYE_WARP_QUALITY", 1);
+    config.show_indicator = get_env_bool("MONOEYE_INDICATOR", true);
 
     auto debug_path = get_env_opt("MONOEYE_DEBUG_OUTPUT_PATH");
     if (debug_path) {
@@ -80,6 +81,7 @@ Config load_config() {
     MONOEYE_LOG("  ipd_override: %.4f", config.ipd_override);
     MONOEYE_LOG("  render_width_percent: %.1f", config.render_width_percent);
     MONOEYE_LOG("  warp_quality: %d", config.warp_quality);
+    MONOEYE_LOG("  show_indicator: %s", config.show_indicator ? "true" : "false");
 
     return config;
 }

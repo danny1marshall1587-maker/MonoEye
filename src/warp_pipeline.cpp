@@ -14,6 +14,17 @@
 
 namespace monoeye {
 
+struct WarpPushConstants {
+    float ipd;
+    float nearZ;
+    float farZ;
+    float focalLength;
+    uint32_t hasDepthBuffer;
+    uint32_t qualityMode;
+    uint32_t showIndicator;
+    uint32_t frameIndex;
+};
+
 WarpPipeline::WarpPipeline() = default;
 
 WarpPipeline::~WarpPipeline() {
@@ -250,11 +261,17 @@ VkResult WarpPipeline::create_descriptor_resources() {
 }
 
 VkResult WarpPipeline::create_compute_pipeline() {
-    // Pipeline layout
+    VkPushConstantRange pushRange = {};
+    pushRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    pushRange.offset = 0;
+    pushRange.size = sizeof(WarpPushConstants);
+
     VkPipelineLayoutCreateInfo layoutInfo = {};
     layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     layoutInfo.setLayoutCount = 1;
     layoutInfo.pSetLayouts = &m_descriptorSetLayout;
+    layoutInfo.pushConstantRangeCount = 1;
+    layoutInfo.pPushConstantRanges = &pushRange;
 
     VkResult result = vkCreatePipelineLayout(m_vkDevice, &layoutInfo, nullptr, &m_pipelineLayout);
     if (result != VK_SUCCESS) {
@@ -431,6 +448,22 @@ VkResult WarpPipeline::record_compute_command(
 
     // Bind the compute pipeline
     vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_computePipeline);
+
+    // Push constants
+    const Config& config = get_config();
+    static uint32_t s_frame_index = 0;
+    WarpPushConstants pc = {};
+    pc.ipd = config.ipd_override > 0.0f ? config.ipd_override : 0.064f;
+    pc.nearZ = 0.1f;    // Default near plane
+    pc.farZ = 1000.0f;  // Default far plane
+    pc.focalLength = 1.0f;
+    pc.hasDepthBuffer = leftDepth ? 1 : 0;
+    pc.qualityMode = (uint32_t)config.warp_quality;
+    pc.showIndicator = config.show_indicator ? 1 : 0;
+    pc.frameIndex = s_frame_index++;
+
+    vkCmdPushConstants(m_commandBuffer, m_pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 
+        0, sizeof(WarpPushConstants), &pc);
 
     // Bind the descriptor set
     vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE,

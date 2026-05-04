@@ -10,12 +10,14 @@ namespace MonoEyeSwitcher
         private Button toggleButton;
         private ComboBox qualityComboBox;
         private ComboBox leftEyeComboBox;
+        private CheckBox indicatorCheckbox;
         private Label statusLabel;
         private Label qualityLabel;
         private Label leftEyeLabel;
         private Label titleLabel;
         private Label infoLabel;
-        private CheckBox applyButton;
+        private Label openVrLabel;
+        private Button saveButton;
 
         private bool isEnabled = false;
 
@@ -28,7 +30,7 @@ namespace MonoEyeSwitcher
         private void InitializeComponent()
         {
             this.Text = "MonoEye Switcher";
-            this.Size = new Size(420, 380);
+            this.Size = new Size(420, 420);
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
             this.StartPosition = FormStartPosition.CenterScreen;
@@ -154,20 +156,32 @@ namespace MonoEyeSwitcher
                 BackColor = Color.FromArgb(40, 40, 40),
                 ForeColor = Color.White
             };
-            leftEyeComboBox.Items.AddRange(new object[] { "Left eye", "Right eye" });
-            leftEyeComboBox.SelectedIndex = 0;
+            leftEyeComboBox.Items.AddRange(new object[] { "Left Eye", "Right Eye" });
+            leftEyeComboBox.SelectedIndex = 0; // Left eye default
             this.Controls.Add(leftEyeComboBox);
 
-            // Apply button (checkbox)
-            applyButton = new CheckBox
+            // Indicator checkbox
+            indicatorCheckbox = new CheckBox
             {
-                Text = " Apply settings to environment",
+                Text = "Show active indicator (green dot in headset)",
                 Font = new Font("Segoe UI", 9F),
-                ForeColor = Color.FromArgb(180, 180, 180),
+                ForeColor = Color.FromArgb(200, 200, 200),
                 AutoSize = true,
-                Location = new Point(20, 300)
+                Location = new Point(20, 310),
+                Checked = true
             };
-            this.Controls.Add(applyButton);
+            this.Controls.Add(indicatorCheckbox);
+
+            // OpenVR Label
+            openVrLabel = new Label
+            {
+                Text = "TIP: For SteamVR/OpenVR games, use 'OpenComposite' to enable MonoEye support.",
+                Font = new Font("Segoe UI", 8F, FontStyle.Italic),
+                ForeColor = Color.FromArgb(140, 140, 140),
+                Size = new Size(380, 20),
+                Location = new Point(20, 345)
+            };
+            this.Controls.Add(openVrLabel);
 
             // Save button
             Button saveButton = new Button
@@ -334,12 +348,14 @@ namespace MonoEyeSwitcher
                 };
 
                 string leftEyeMode = leftEyeComboBox.SelectedIndex == 0 ? "left" : "right";
+                string indicatorMode = indicatorCheckbox.Checked ? "1" : "0";
 
                 Environment.SetEnvironmentVariable("MONOEYE_QUALITY", qualityMode, EnvironmentVariableTarget.Machine);
                 Environment.SetEnvironmentVariable("MONOEYE_LEFT_EYE", leftEyeMode, EnvironmentVariableTarget.Machine);
+                Environment.SetEnvironmentVariable("MONOEYE_INDICATOR", indicatorMode, EnvironmentVariableTarget.Machine);
 
                 MessageBox.Show(
-                    $"Settings applied:\n\nQuality: {qualityMode}\nRender eye: {leftEyeMode}\n\nRestart any running VR applications for changes to take effect.",
+                    $"Settings applied:\n\nQuality: {qualityMode}\nRender eye: {leftEyeMode}\nIndicator: {(indicatorCheckbox.Checked ? "On" : "Off")}\n\nRestart any running VR applications for changes to take effect.",
                     "MonoEye Switcher",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information
