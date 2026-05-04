@@ -20,6 +20,9 @@
 
 namespace monoeye {
 
+struct XrGeneratedDispatchTable;
+struct SwapchainImageInfo;
+
 // Swapchain image tracking info
 struct SwapchainImageInfo {
     XrSwapchain swapchain;
@@ -58,6 +61,9 @@ public:
         uint32_t layerCount,
         const XrCompositionLayerBaseHeader* const* layers
     );
+
+    // Get all tracked swapchains
+    std::vector<SwapchainImageInfo*> get_all();
 
     // Get or create a "shadow" swapchain for the right eye reconstruction
     XrSwapchain get_or_create_right_swapchain(

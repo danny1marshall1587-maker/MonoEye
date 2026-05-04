@@ -182,5 +182,3 @@ extern "C" XrResult monoeye_xrEndFrame(
 }
 
 } // namespace monoeye
-
-} // namespace monoeye

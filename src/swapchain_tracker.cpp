@@ -3,6 +3,7 @@
 
 #include "swapchain_tracker.h"
 #include "logging.h"
+#include "dispatch_table.h"
 #include <cstring>
 
 namespace monoeye {
