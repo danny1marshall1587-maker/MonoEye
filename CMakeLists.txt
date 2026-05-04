@@ -140,6 +140,7 @@ set(MONOEYE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/hooks_frame.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/hooks_swapchain.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/hooks_session.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/hooks_view.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/swapchain_tracker.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/warp_pipeline.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/config.cpp

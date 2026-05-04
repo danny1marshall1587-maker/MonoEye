@@ -163,6 +163,73 @@ std::vector<SwapchainImageInfo*> SwapchainTracker::get_all() {
     return result;
 }
 
+XrSwapchain SwapchainTracker::get_or_create_right_swapchain(
+    XrSession session,
+    const XrSwapchainCreateInfo& leftCreateInfo,
+    XrGeneratedDispatchTable* dispatch
+) {
+    std::lock_guard<std::mutex> lock(m_mutex);
+
+    auto it = m_right_swapchains.find(session);
+    if (it != m_right_swapchains.end()) {
+        // Future: Check if size/format matches, recreate if not
+        return it->second;
+    }
+
+    // Create a new swapchain for our internal use
+    XrSwapchainCreateInfo createInfo = leftCreateInfo;
+    // Ensure it has sampled and storage usage for our compute shader
+    createInfo.usageFlags |= XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT | XR_SWAPCHAIN_USAGE_TRANSFER_DST_BIT;
+    
+    XrSwapchain rightSwapchain = XR_NULL_HANDLE;
+    XrResult result = ((PFN_xrCreateSwapchain)dispatch->CreateSwapchain)(session, &createInfo, &rightSwapchain);
+
+    if (result != XR_SUCCESS) {
+        MONOEYE_LOG_ERROR("Failed to create shadow swapchain: %d", result);
+        return XR_NULL_HANDLE;
+    }
+
+    m_right_swapchains[session] = rightSwapchain;
+
+    // We also need to enumerate images to track it
+    uint32_t imageCount = 0;
+    ((PFN_xrEnumerateSwapchainImages)dispatch->EnumerateSwapchainImages)(rightSwapchain, 0, &imageCount, nullptr);
+
+    if (imageCount > 0) {
+        std::vector<XrSwapchainImageVulkanKHR> vkImages(imageCount);
+        for (uint32_t i = 0; i < imageCount; ++i) {
+            vkImages[i].type = XR_TYPE_SWAPCHAIN_IMAGE_VULKAN_KHR;
+            vkImages[i].next = nullptr;
+        }
+
+        uint32_t actualCount = 0;
+        ((PFN_xrEnumerateSwapchainImages)dispatch->EnumerateSwapchainImages)(
+            rightSwapchain,
+            imageCount,
+            &actualCount,
+            reinterpret_cast<XrSwapchainImageBaseHeader*>(vkImages.data())
+        );
+
+        // Track it (but don't use the lock since we already have it)
+        SwapchainImageInfo info;
+        info.swapchain = rightSwapchain;
+        info.createInfo = createInfo;
+        info.imageCount = actualCount;
+        info.isDepth = false;
+        info.isLeftEye = false;
+        info.isRightEye = true; // Mark as right eye
+        info.isVulkan = true;
+        for (uint32_t i = 0; i < actualCount; ++i) {
+            info.vulkanImages.push_back(vkImages[i].image);
+        }
+
+        m_swapchains[rightSwapchain] = info;
+    }
+
+    MONOEYE_LOG("Created shadow right swapchain: %p", (void*)(uintptr_t)rightSwapchain);
+    return rightSwapchain;
+}
+
 void SwapchainTracker::reset_eye_assignments() {
     std::lock_guard<std::mutex> lock(m_mutex);
     for (auto& pair : m_swapchains) {

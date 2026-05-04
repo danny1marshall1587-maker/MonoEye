@@ -70,9 +70,21 @@ extern "C" XrResult monoeye_xrCreateSession(
                     MONOEYE_LOG("Vulkan session detected: device=%p, instance=%p, queueFamily=%u",
                         (void*)vb->device, (void*)vb->instance, vb->queueFamilyIndex);
 
+                    // Get the physical device
+                    VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+                    XrVulkanGraphicsDeviceGetInfoKHR getInfo = {XR_TYPE_VULKAN_GRAPHICS_DEVICE_GET_INFO_KHR};
+                    getInfo.systemId = createInfo->systemId;
+                    getInfo.vulkanInstance = vb->instance;
+                    
+                    if (dispatch->GetVulkanGraphicsDevice2KHR) {
+                        ((PFN_xrGetVulkanGraphicsDevice2KHR)dispatch->GetVulkanGraphicsDevice2KHR)(
+                            instance, &getInfo, &physicalDevice);
+                    }
+
                     // Initialize the warp pipeline with this Vulkan device
                     WarpPipeline::get_instance().initialize(
                         vb->instance,
+                        physicalDevice,
                         vb->device,
                         vb->queueFamilyIndex
                     );

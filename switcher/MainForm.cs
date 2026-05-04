@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
+using Microsoft.Win32;
 
 namespace MonoEyeSwitcher
 {
@@ -205,11 +206,33 @@ namespace MonoEyeSwitcher
                     toggleButton.Text = "Enable";
                     toggleButton.BackColor = Color.FromArgb(0, 150, 220);
                 }
+
+                // Also check Registry
+                CheckRegistryStatus();
             }
             catch
             {
                 statusLabel.Text = "Status: Error";
                 statusLabel.ForeColor = Color.Yellow;
+            }
+        }
+
+        private void CheckRegistryStatus()
+        {
+            string jsonPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "XR_APILAYER_NOVENDOR_monoeye.json");
+            using (RegistryKey key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Khronos\OpenXR\1\ApiLayers\Explicit"))
+            {
+                if (key != null && key.GetValue(jsonPath) != null) return;
+            }
+            using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Khronos\OpenXR\1\ApiLayers\Explicit"))
+            {
+                if (key != null && key.GetValue(jsonPath) != null) return;
+            }
+            
+            if (isEnabled)
+            {
+                statusLabel.Text = "Status: PARTIAL (Env only)";
+                statusLabel.ForeColor = Color.Orange;
             }
         }
 
@@ -221,10 +244,12 @@ namespace MonoEyeSwitcher
                 {
                     Environment.SetEnvironmentVariable("MONOEYE_ENABLE", "1", EnvironmentVariableTarget.Machine);
                     Environment.SetEnvironmentVariable("MONOEYE_DISABLE", null, EnvironmentVariableTarget.Machine);
+                    RegisterOpenXRLayer(true);
                 }
                 else
                 {
                     Environment.SetEnvironmentVariable("MONOEYE_ENABLE", null, EnvironmentVariableTarget.Machine);
+                    RegisterOpenXRLayer(false);
                 }
 
                 UpdateStatus();
@@ -235,14 +260,44 @@ namespace MonoEyeSwitcher
                     MessageBoxIcon.Information
                 );
             }
+        }
+
+        private void RegisterOpenXRLayer(bool enable)
+        {
+            string jsonPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "XR_APILAYER_NOVENDOR_monoeye.json");
+            string subKey = @"SOFTWARE\Khronos\OpenXR\1\ApiLayers\Explicit";
+
+            try
+            {
+                if (enable)
+                {
+                    using (RegistryKey key = Registry.LocalMachine.CreateSubKey(subKey))
+                    {
+                        key.SetValue(jsonPath, 0, RegistryValueKind.DWord);
+                    }
+                }
+                else
+                {
+                    using (RegistryKey key = Registry.LocalMachine.OpenSubKey(subKey, true))
+                    {
+                        if (key != null) key.DeleteValue(jsonPath, false);
+                    }
+                    using (RegistryKey key = Registry.CurrentUser.OpenSubKey(subKey, true))
+                    {
+                        if (key != null) key.DeleteValue(jsonPath, false);
+                    }
+                }
+            }
             catch (Exception ex)
             {
-                MessageBox.Show(
-                    $"Failed to change MonoEye status:\n\n{ex.Message}\n\nMake sure you are running as Administrator.",
-                    "Error",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Error
-                );
+                // Fallback to CurrentUser if LocalMachine fails
+                if (enable)
+                {
+                    using (RegistryKey key = Registry.CurrentUser.CreateSubKey(subKey))
+                    {
+                        key.SetValue(jsonPath, 0, RegistryValueKind.DWord);
+                    }
+                }
             }
         }
 

@@ -59,10 +59,13 @@ public:
         const XrCompositionLayerBaseHeader* const* layers
     );
 
-    // Get all tracked swapchains
-    std::vector<SwapchainImageInfo*> get_all();
+    // Get or create a "shadow" swapchain for the right eye reconstruction
+    XrSwapchain get_or_create_right_swapchain(
+        XrSession session,
+        const XrSwapchainCreateInfo& leftCreateInfo,
+        XrGeneratedDispatchTable* dispatch
+    );
 
-    // Reset eye assignments between frames
     void reset_eye_assignments();
 
 private:
@@ -70,6 +73,7 @@ private:
 
     std::mutex m_mutex;
     std::unordered_map<XrSwapchain, SwapchainImageInfo> m_swapchains;
+    std::unordered_map<XrSession, XrSwapchain> m_right_swapchains; // One shadow per session
     std::unordered_map<XrSwapchain, bool> m_assigned_eye;
 
     void mark_as_depth(XrSwapchain swapchain);

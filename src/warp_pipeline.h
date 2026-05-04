@@ -29,6 +29,7 @@ public:
     // Initialize with Vulkan device from the OpenXR session
     VkResult initialize(
         VkInstance vkInstance,
+        VkPhysicalDevice vkPhysicalDevice,
         VkDevice vkDevice,
         uint32_t queueFamilyIndex
     );
@@ -79,6 +80,7 @@ private:
 
     // Vulkan objects
     VkInstance m_vkInstance = VK_NULL_HANDLE;
+    VkPhysicalDevice m_vkPhysicalDevice = VK_NULL_HANDLE;
     VkDevice m_vkDevice = VK_NULL_HANDLE;
     VkQueue m_vkQueue = VK_NULL_HANDLE;
     VkCommandPool m_commandPool = VK_NULL_HANDLE;
@@ -99,6 +101,7 @@ private:
 
     // State
     bool m_initialized = false;
+    bool m_hasTensorCores = false;
     uint32_t m_queueFamilyIndex = 0;
 };
 

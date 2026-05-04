@@ -32,6 +32,24 @@ extern "C" XrResult monoeye_xrDestroySession(
     XrSession session
 );
 
+extern "C" XrResult monoeye_xrEnumerateViewConfigurationViews(
+    XrInstance instance,
+    XrSystemId systemId,
+    XrViewConfigurationType viewConfigurationType,
+    uint32_t viewCapacityInput,
+    uint32_t* viewCountOutput,
+    XrViewConfigurationView* views
+);
+
+extern "C" XrResult monoeye_xrLocateViews(
+    XrSession session,
+    const XrViewLocateInfo* viewLocateInfo,
+    XrViewState* viewState,
+    uint32_t viewCapacityInput,
+    uint32_t* viewCountOutput,
+    XrView* views
+);
+
 extern "C" XrResult monoeye_xrCreateSwapchain(
     XrSession session,
     const XrSwapchainCreateInfo* createInfo,
@@ -128,6 +146,8 @@ static const HookedFunction s_hooked_functions[] = {
     {"xrReleaseSwapchainImage", (PFN_xrVoidFunction)monoeye_xrReleaseSwapchainImage},
     {"xrGetVulkanGraphicsRequirements2KHR", (PFN_xrVoidFunction)monoeye_xrGetVulkanGraphicsRequirements2KHR},
     {"xrGetVulkanGraphicsDevice2KHR",       (PFN_xrVoidFunction)monoeye_xrGetVulkanGraphicsDevice2KHR},
+    {"xrEnumerateViewConfigurationViews",   (PFN_xrVoidFunction)monoeye_xrEnumerateViewConfigurationViews},
+    {"xrLocateViews",                       (PFN_xrVoidFunction)monoeye_xrLocateViews},
     {nullptr, nullptr}
 };
 

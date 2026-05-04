@@ -89,6 +89,15 @@ echo Enabling MonoEye...
 setx MONOEYE_ENABLE 1 /M >nul
 echo   - MONOEYE_ENABLE=1 set
 
+:: Register OpenXR API Layer in Registry
+echo Registering OpenXR API Layer...
+reg add "HKLM\SOFTWARE\Khronos\OpenXR\1\ApiLayers\Explicit" /v "%INSTALL_DIR%\XR_APILAYER_NOVENDOR_monoeye.json" /t REG_DWORD /d 0 /f >nul
+if %errorLevel% neq 0 (
+    echo   WARNING: Failed to register OpenXR layer in HKLM. Trying HKCU...
+    reg add "HKCU\SOFTWARE\Khronos\OpenXR\1\ApiLayers\Explicit" /v "%INSTALL_DIR%\XR_APILAYER_NOVENDOR_monoeye.json" /t REG_DWORD /d 0 /f >nul
+)
+echo   - OpenXR API Layer registered
+
 :: Add to PATH if not already there
 echo "%PATH%" | find /i "%INSTALL_DIR%" >nul
 if %errorLevel% neq 0 (

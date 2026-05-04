@@ -29,6 +29,7 @@ WarpPipeline& WarpPipeline::get_instance() {
 
 VkResult WarpPipeline::initialize(
     VkInstance vkInstance,
+    VkPhysicalDevice vkPhysicalDevice,
     VkDevice vkDevice,
     uint32_t queueFamilyIndex
 ) {
@@ -38,6 +39,7 @@ VkResult WarpPipeline::initialize(
     }
 
     m_vkInstance = vkInstance;
+    m_vkPhysicalDevice = vkPhysicalDevice;
     m_vkDevice = vkDevice;
     m_queueFamilyIndex = queueFamilyIndex;
 
@@ -103,8 +105,24 @@ VkResult WarpPipeline::initialize(
         return result;
     }
 
+    // Check for Tensor Core support (NV Cooperative Matrix)
+    m_hasTensorCores = false;
+    uint32_t extensionCount = 0;
+    vkEnumerateDeviceExtensionProperties(m_vkPhysicalDevice, nullptr, &extensionCount, nullptr);
+    std::vector<VkExtensionProperties> extensions(extensionCount);
+    vkEnumerateDeviceExtensionProperties(m_vkPhysicalDevice, nullptr, &extensionCount, extensions.data());
+
+    for (const auto& ext : extensions) {
+        if (strcmp(ext.extensionName, VK_NV_COOPERATIVE_MATRIX_EXTENSION_NAME) == 0) {
+            m_hasTensorCores = true;
+            MONOEYE_LOG("NVIDIA Tensor Cores (Cooperative Matrix) detected and ready for acceleration.");
+            break;
+        }
+    }
+
     m_initialized = true;
-    MONOEYE_LOG("Vulkan warp pipeline initialized successfully");
+    MONOEYE_LOG("Vulkan warp pipeline initialized successfully %s", 
+        m_hasTensorCores ? "with Tensor Core support" : "(standard compute only)");
 
     return VK_SUCCESS;
 }

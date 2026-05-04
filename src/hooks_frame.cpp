@@ -66,91 +66,7 @@ extern "C" XrResult monoeye_xrEndFrame(
 ) {
     const Config& config = get_config();
 
-    // If bypass mode is enabled, just pass through
-    if (config.bypass_mode || !config.enabled) {
-        XrInstance instance = XR_NULL_HANDLE;
-        {
-            std::lock_guard<std::mutex> lock(s_session_map_mutex);
-            auto it = s_session_map.find(session);
-            if (it != s_session_map.end()) {
-                instance = it->second;
-            }
-        }
-
-        if (instance == XR_NULL_HANDLE) {
-            return XR_ERROR_SESSION_LOST;
-        }
-
-        XrGeneratedDispatchTable* dispatch = nullptr;
-        {
-            std::lock_guard<std::mutex> lock(g_instance_dispatch_mutex);
-            auto it = g_instance_dispatch_map.find(instance);
-            if (it != g_instance_dispatch_map.end()) {
-                dispatch = it->second;
-            }
-        }
-
-        if (!dispatch || !dispatch->EndFrame) {
-            return XR_ERROR_RUNTIME_FAILURE;
-        }
-
-        return ((PFN_xrEndFrame)dispatch->EndFrame)(session, frameEndInfo);
-    }
-
-    // --- MONOEYE DEPTH WARP PIPELINE ---
-
-    MONOEYE_LOG_DEBUG("xrEndFrame: %d layers", frameEndInfo->layerCount);
-
-    // 1. Analyze frame to identify left/right eye swapchains
-    // We need to build an array of layer pointers
-    std::vector<const XrCompositionLayerBaseHeader*> layers(frameEndInfo->layerCount);
-    for (uint32_t i = 0; i < frameEndInfo->layerCount; ++i) {
-        layers[i] = frameEndInfo->layers[i];
-    }
-
-    SwapchainTracker::get_instance().analyze_frame_views(
-        frameEndInfo->layerCount,
-        layers.data()
-    );
-
-    // 2. Find left eye color and depth swapchains
-    SwapchainImageInfo* leftColorInfo = nullptr;
-    SwapchainImageInfo* leftDepthInfo = nullptr;
-    SwapchainImageInfo* rightColorInfo = nullptr;
-
-    for (auto* info : SwapchainTracker::get_instance().get_all()) {
-        if (info->isDepth && info->isLeftEye) {
-            leftDepthInfo = info;
-        } else if (!info->isDepth && info->isLeftEye) {
-            leftColorInfo = info;
-        } else if (!info->isDepth && info->isRightEye) {
-            rightColorInfo = info;
-        }
-    }
-
-    // 3. If we have the required inputs, perform the depth warp
-    if (leftColorInfo && rightColorInfo) {
-        MONOEYE_LOG("MonoEye depth warp: left=%p, right=%p, depth=%s",
-            (void*)(uintptr_t)leftColorInfo->swapchain,
-            (void*)(uintptr_t)rightColorInfo->swapchain,
-            leftDepthInfo ? "present" : "absent");
-
-        // Execute the depth warp compute shader
-        // This reads left eye color + depth, writes warped result to right eye
-        WarpPipeline::get_instance().execute_warp(
-            leftColorInfo,
-            leftDepthInfo,
-            rightColorInfo,
-            frameEndInfo->displayTime
-        );
-    } else {
-        MONOEYE_LOG_WARN("Missing required swapchains for depth warp:");
-        MONOEYE_LOG_WARN("  leftColor: %s", leftColorInfo ? "found" : "MISSING");
-        MONOEYE_LOG_WARN("  rightColor: %s", rightColorInfo ? "found" : "MISSING");
-        MONOEYE_LOG_WARN("  leftDepth: %s", leftDepthInfo ? "found" : "MISSING");
-    }
-
-    // 4. Pass through to the runtime
+    // Find the instance for this session
     XrInstance instance = XR_NULL_HANDLE;
     {
         std::lock_guard<std::mutex> lock(s_session_map_mutex);
@@ -160,9 +76,7 @@ extern "C" XrResult monoeye_xrEndFrame(
         }
     }
 
-    if (instance == XR_NULL_HANDLE) {
-        return XR_ERROR_SESSION_LOST;
-    }
+    if (instance == XR_NULL_HANDLE) return XR_ERROR_SESSION_LOST;
 
     XrGeneratedDispatchTable* dispatch = nullptr;
     {
@@ -172,12 +86,99 @@ extern "C" XrResult monoeye_xrEndFrame(
             dispatch = it->second;
         }
     }
+    if (!dispatch || !dispatch->EndFrame) return XR_ERROR_RUNTIME_FAILURE;
 
-    if (!dispatch || !dispatch->EndFrame) {
-        return XR_ERROR_RUNTIME_FAILURE;
+    // Passthrough if disabled
+    if (!config.enabled || config.bypass_mode) {
+        return ((PFN_xrEndFrame)dispatch->EndFrame)(session, frameEndInfo);
     }
 
-    return ((PFN_xrEndFrame)dispatch->EndFrame)(session, frameEndInfo);
+    // --- MONOEYE DEPTH WARP PIPELINE ---
+    
+    // We may need to modify the layer submission
+    std::vector<const XrCompositionLayerBaseHeader*> modifiedLayers;
+    modifiedLayers.reserve(frameEndInfo->layerCount);
+
+    // Track views we allocate per-frame
+    static thread_local std::vector<std::vector<XrCompositionLayerProjectionView>> s_view_storage;
+    s_view_storage.clear();
+
+    for (uint32_t i = 0; i < frameEndInfo->layerCount; ++i) {
+        const XrCompositionLayerBaseHeader* layer = frameEndInfo->layers[i];
+        
+        if (layer->type == XR_TYPE_COMPOSITION_LAYER_PROJECTION) {
+            const XrCompositionLayerProjection* projLayer = 
+                reinterpret_cast<const XrCompositionLayerProjection*>(layer);
+            
+            if (projLayer->viewCount == 1) {
+                // MONO BYPASS DETECTED - Expand to Stereo
+                MONOEYE_LOG_DEBUG("Mono projection detected, expanding to stereo");
+
+                s_view_storage.emplace_back(2);
+                auto& newViews = s_view_storage.back();
+                
+                // Copy the first view (Left)
+                newViews[0] = projLayer->views[0];
+                
+                // Create the second view (Right)
+                newViews[1] = projLayer->views[0]; // Start with left's data
+                
+                // 1. Get or create the shadow right swapchain
+                SwapchainImageInfo* leftInfo = SwapchainTracker::get_instance().get_info(newViews[0].subImage.swapchain);
+                if (leftInfo) {
+                    XrSwapchain rightSwapchain = SwapchainTracker::get_instance().get_or_create_right_swapchain(
+                        session, leftInfo->createInfo, dispatch);
+                    
+                    if (rightSwapchain != XR_NULL_HANDLE) {
+                        newViews[1].subImage.swapchain = rightSwapchain;
+                        
+                        // 2. Perform the depth warp
+                        SwapchainImageInfo* leftDepthInfo = nullptr;
+                        const XrBaseInStructure* next = reinterpret_cast<const XrBaseInStructure*>(newViews[0].next);
+                        while (next) {
+                            if (next->type == XR_TYPE_COMPOSITION_LAYER_DEPTH_INFO_KHR) {
+                                const XrCompositionLayerDepthInfoKHR* depthInfo = 
+                                    reinterpret_cast<const XrCompositionLayerDepthInfoKHR*>(next);
+                                leftDepthInfo = SwapchainTracker::get_instance().get_info(depthInfo->subImage.swapchain);
+                                break;
+                            }
+                            next = next->next;
+                        }
+
+                        SwapchainImageInfo* rightInfo = SwapchainTracker::get_instance().get_info(rightSwapchain);
+                        
+                        if (rightInfo) {
+                            WarpPipeline::get_instance().execute_warp(
+                                leftInfo, leftDepthInfo, rightInfo, frameEndInfo->displayTime);
+                        }
+                    }
+                }
+
+                // 3. Create a modified projection layer
+                // We use a static local to store the modified layers to avoid pointer invalidation
+                static thread_local std::vector<XrCompositionLayerProjection> s_proj_storage;
+                s_proj_storage.clear();
+                s_proj_storage.push_back(*projLayer);
+                XrCompositionLayerProjection& newLayer = s_proj_storage.back();
+                newLayer.viewCount = 2;
+                newLayer.views = newViews.data();
+                
+                modifiedLayers.push_back(reinterpret_cast<const XrCompositionLayerBaseHeader*>(&newLayer));
+                continue;
+            }
+        }
+        
+        // Default: Keep original layer
+        modifiedLayers.push_back(layer);
+    }
+
+    // Update the frame info
+    XrFrameEndInfo modifiedFrameEndInfo = *frameEndInfo;
+    modifiedFrameEndInfo.layers = modifiedLayers.data();
+
+    return ((PFN_xrEndFrame)dispatch->EndFrame)(session, &modifiedFrameEndInfo);
 }
+
+} // namespace monoeye
 
 } // namespace monoeye
