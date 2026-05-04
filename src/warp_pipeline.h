@@ -56,6 +56,11 @@ public:
     // Check if initialized
     bool is_initialized() const { return m_initialized; }
 
+    VkDevice get_device() const { return m_vkDevice; }
+    VkQueue get_queue() const { return m_vkQueue; }
+    VkInstance get_vk_instance() const { return m_vkInstance; }
+    VkPhysicalDevice get_physical_device() const { return m_vkPhysicalDevice; }
+
 private:
     WarpPipeline();
     ~WarpPipeline();

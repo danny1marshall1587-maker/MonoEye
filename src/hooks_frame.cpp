@@ -7,6 +7,7 @@
 #include "swapchain_tracker.h"
 #include "warp_pipeline.h"
 #include "config.h"
+#include "overlay_manager.h"
 
 #include <vector>
 #include <mutex>
@@ -174,8 +175,15 @@ extern "C" XrResult monoeye_xrEndFrame(
         modifiedLayers.push_back(layer);
     }
 
+    // 4. Add the overlay layer if visible (top-most layer)
+    const XrCompositionLayerBaseHeader* overlayLayer = OverlayManager::get_instance().get_composition_layer();
+    if (overlayLayer) {
+        modifiedLayers.push_back(overlayLayer);
+    }
+
     // Update the frame info
     XrFrameEndInfo modifiedFrameEndInfo = *frameEndInfo;
+    modifiedFrameEndInfo.layerCount = (uint32_t)modifiedLayers.size();
     modifiedFrameEndInfo.layers = modifiedLayers.data();
 
     return ((PFN_xrEndFrame)dispatch->EndFrame)(session, &modifiedFrameEndInfo);

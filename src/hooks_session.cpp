@@ -10,6 +10,7 @@
 #include <vulkan/vulkan.h>
 #include <openxr/openxr_platform.h>
 
+#include "overlay_manager.h"
 #include <mutex>
 #include <unordered_map>
 
@@ -88,6 +89,16 @@ extern "C" XrResult monoeye_xrCreateSession(
                         physicalDevice,
                         vb->device,
                         vb->queueFamilyIndex
+                    );
+
+                    // Initialize the overlay manager
+                    OverlayManager::get_instance().initialize(
+                        instance,
+                        *session,
+                        vb->device,
+                        physicalDevice,
+                        vb->queueFamilyIndex,
+                        WarpPipeline::get_instance().get_queue()
                     );
 
                     break;

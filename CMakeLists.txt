@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.18)
 project(MonoEye
-    VERSION 0.2.0
+    VERSION 0.3.0
     DESCRIPTION "MonoEye - Single-eye VR rendering with depth-based second eye reconstruction"
     LANGUAGES CXX
 )
@@ -146,6 +146,7 @@ set(MONOEYE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/config.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/logging.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/vulkan_utils.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/overlay_manager.cpp
 )
 
 # Build the API layer shared library
