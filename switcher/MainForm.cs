@@ -11,6 +11,9 @@ namespace MonoEyeSwitcher
         private ComboBox qualityComboBox;
         private ComboBox leftEyeComboBox;
         private CheckBox indicatorCheckbox;
+        private CheckBox tensorCheckbox;
+        private CheckBox specularCheckbox;
+        private CheckBox edgeCheckbox;
         private Label statusLabel;
         private Label qualityLabel;
         private Label leftEyeLabel;
@@ -29,8 +32,8 @@ namespace MonoEyeSwitcher
 
         private void InitializeComponent()
         {
-            this.Text = "MonoEye Switcher";
-            this.Size = new Size(420, 420);
+            this.Text = "MonoEye Switcher v3 (Alpha)";
+            this.Size = new Size(420, 560);
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
             this.StartPosition = FormStartPosition.CenterScreen;
@@ -172,27 +175,62 @@ namespace MonoEyeSwitcher
             };
             this.Controls.Add(indicatorCheckbox);
 
-            // OpenVR Label
-            openVrLabel = new Label
-            {
-                Text = "TIP: For SteamVR/OpenVR games, use 'OpenComposite' to enable MonoEye support.",
-                Font = new Font("Segoe UI", 8F, FontStyle.Italic),
-                ForeColor = Color.FromArgb(140, 140, 140),
-                Size = new Size(380, 20),
-                Location = new Point(20, 345)
-            };
             this.Controls.Add(openVrLabel);
+
+            // --- v3 Advanced Clarity Section ---
+            GroupBox v3Group = new GroupBox
+            {
+                Text = "v3 Advanced Clarity (Experimental)",
+                ForeColor = Color.FromArgb(0, 150, 220),
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                Size = new Size(360, 130),
+                Location = new Point(20, 370)
+            };
+            this.Controls.Add(v3Group);
+
+            tensorCheckbox = new CheckBox
+            {
+                Text = "Use NVIDIA Tensor Cores (AI Stabilization)",
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 8.5F),
+                Location = new Point(15, 25),
+                AutoSize = true,
+                Checked = false
+            };
+            v3Group.Controls.Add(tensorCheckbox);
+
+            specularCheckbox = new CheckBox
+            {
+                Text = "Specular De-Shimmer (Input Cleaning)",
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 8.5F),
+                Location = new Point(15, 55),
+                AutoSize = true,
+                Checked = true
+            };
+            v3Group.Controls.Add(specularCheckbox);
+
+            edgeCheckbox = new CheckBox
+            {
+                Text = "Glass-Edge Smoothing (Depth-Masked AA)",
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 8.5F),
+                Location = new Point(15, 85),
+                AutoSize = true,
+                Checked = true
+            };
+            v3Group.Controls.Add(edgeCheckbox);
 
             // Save button
             Button saveButton = new Button
             {
                 Text = "Apply Settings",
-                Size = new Size(160, 30),
-                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                Size = new Size(360, 35),
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
                 BackColor = Color.FromArgb(60, 60, 60),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
-                Location = new Point(220, 295)
+                Location = new Point(20, 510)
             };
             saveButton.FlatAppearance.BorderSize = 0;
             saveButton.Click += SaveButton_Click;
@@ -326,17 +364,6 @@ namespace MonoEyeSwitcher
 
         private void SaveButton_Click(object sender, EventArgs e)
         {
-            if (!applyButton.Checked)
-            {
-                MessageBox.Show(
-                    "Check the 'Apply settings' box first, then click this button to save quality and eye settings.",
-                    "MonoEye Switcher",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information
-                );
-                return;
-            }
-
             try
             {
                 string qualityMode = qualityComboBox.SelectedIndex switch
@@ -353,9 +380,12 @@ namespace MonoEyeSwitcher
                 Environment.SetEnvironmentVariable("MONOEYE_QUALITY", qualityMode, EnvironmentVariableTarget.Machine);
                 Environment.SetEnvironmentVariable("MONOEYE_LEFT_EYE", leftEyeMode, EnvironmentVariableTarget.Machine);
                 Environment.SetEnvironmentVariable("MONOEYE_INDICATOR", indicatorMode, EnvironmentVariableTarget.Machine);
+                Environment.SetEnvironmentVariable("MONOEYE_TENSOR_STABILIZATION", tensorCheckbox.Checked ? "1" : "0", EnvironmentVariableTarget.Machine);
+                Environment.SetEnvironmentVariable("MONOEYE_SPECULAR_REJECTION", specularCheckbox.Checked ? "1" : "0", EnvironmentVariableTarget.Machine);
+                Environment.SetEnvironmentVariable("MONOEYE_EDGE_SMOOTHING", edgeCheckbox.Checked ? "1" : "0", EnvironmentVariableTarget.Machine);
 
                 MessageBox.Show(
-                    $"Settings applied:\n\nQuality: {qualityMode}\nRender eye: {leftEyeMode}\nIndicator: {(indicatorCheckbox.Checked ? "On" : "Off")}\n\nRestart any running VR applications for changes to take effect.",
+                    $"Settings applied!\n\nv3 Clarity Stack: {(tensorCheckbox.Checked ? "Active (Tensor)" : "Standard")}\nSpecular Cleaning: {(specularCheckbox.Checked ? "On" : "Off")}\nEdge Smoothing: {(edgeCheckbox.Checked ? "On" : "Off")}\n\nRestart VR apps to apply changes.",
                     "MonoEye Switcher",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information

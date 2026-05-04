@@ -61,8 +61,9 @@ Config load_config() {
     config.debug_mode = get_env_bool("MONOEYE_DEBUG_MODE", false);
     config.ipd_override = get_env_float("MONOEYE_IPD_OVERRIDE", 0.0f);
     config.render_width_percent = get_env_float("MONOEYE_RENDER_WIDTH_PERCENT", 100.0f);
-    config.warp_quality = get_env_int("MONOEYE_WARP_QUALITY", 1);
-    config.show_indicator = get_env_bool("MONOEYE_INDICATOR", true);
+    config.tensor_stabilization = get_env_bool("MONOEYE_TENSOR_STABILIZATION", false);
+    config.specular_rejection = get_env_bool("MONOEYE_SPECULAR_REJECTION", true);
+    config.edge_smoothing = get_env_bool("MONOEYE_EDGE_SMOOTHING", true);
 
     auto debug_path = get_env_opt("MONOEYE_DEBUG_OUTPUT_PATH");
     if (debug_path) {
@@ -82,6 +83,9 @@ Config load_config() {
     MONOEYE_LOG("  render_width_percent: %.1f", config.render_width_percent);
     MONOEYE_LOG("  warp_quality: %d", config.warp_quality);
     MONOEYE_LOG("  show_indicator: %s", config.show_indicator ? "true" : "false");
+    MONOEYE_LOG("  tensor_stabilization: %s", config.tensor_stabilization ? "true" : "false");
+    MONOEYE_LOG("  specular_rejection: %s", config.specular_rejection ? "true" : "false");
+    MONOEYE_LOG("  edge_smoothing: %s", config.edge_smoothing ? "true" : "false");
 
     return config;
 }

@@ -23,6 +23,9 @@ struct WarpPushConstants {
     uint32_t hasDepthBuffer;
     uint32_t qualityMode;
     uint32_t showIndicator;
+    uint32_t tensorEnabled;
+    uint32_t specularRejection;
+    uint32_t edgeSmoothing;
     uint32_t frameIndex;
 };
 
@@ -500,6 +503,9 @@ VkResult WarpPipeline::record_compute_command(
     pc.hasDepthBuffer = leftDepth ? 1 : 0;
     pc.qualityMode = (uint32_t)config.warp_quality;
     pc.showIndicator = config.show_indicator ? 1 : 0;
+    pc.tensorEnabled = (config.tensor_stabilization && m_hasTensorCores) ? 1 : 0;
+    pc.specularRejection = config.specular_rejection ? 1 : 0;
+    pc.edgeSmoothing = config.edge_smoothing ? 1 : 0;
     pc.frameIndex = s_frame_index++;
 
     vkCmdPushConstants(m_commandBuffer, m_pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 

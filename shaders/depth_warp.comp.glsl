@@ -25,6 +25,9 @@ layout(push_constant) uniform PushConstants {
     uint hasDepthBuffer;      // 1 if depth buffer is available
     uint qualityMode;         // 0=fast, 1=balanced, 2=quality
     uint showIndicator;       // 1 to show active indicator
+    uint tensorEnabled;       // 1 to use tensor core logic
+    uint specularRejection;   // 1 to remove flickering fireflies
+    uint edgeSmoothing;       // 1 for depth-guided edge AA
     uint frameIndex;          // Frame counter
 } pc;
 
@@ -44,6 +47,25 @@ void main() {
 
     // Sample left eye color
     vec3 leftColor = texture(leftEyeColor, uv).rgb;
+
+    // --- SPECULAR REJECTION (v3) ---
+    if (pc.specularRejection == 1) {
+        // Sample 4 neighbors to find high-frequency noise
+        float texelX = 1.0 / float(imageSize.x);
+        float texelY = 1.0 / float(imageSize.y);
+        vec3 n1 = texture(leftEyeColor, uv + vec2(texelX, 0)).rgb;
+        vec3 n2 = texture(leftEyeColor, uv + vec2(-texelX, 0)).rgb;
+        vec3 n3 = texture(leftEyeColor, uv + vec2(0, texelY)).rgb;
+        vec3 n4 = texture(leftEyeColor, uv + vec2(0, -texelY)).rgb;
+        vec3 avg = (n1 + n2 + n3 + n4) * 0.25;
+        
+        // If current pixel is significantly brighter than average, clamp it
+        float lum = dot(leftColor, vec3(0.299, 0.587, 0.114));
+        float avgLum = dot(avg, vec3(0.299, 0.587, 0.114));
+        if (lum > avgLum * 1.5) {
+            leftColor = mix(leftColor, avg, 0.5);
+        }
+    }
 
     if (pc.hasDepthBuffer == 0) {
         // No depth buffer available - just copy left eye (pass-through)
@@ -128,7 +150,19 @@ void main() {
 
     if (pc.frameIndex > 0) {
         vec3 prevColor = imageLoad(previousFrame, pixelCoord).rgb;
-        color = mix(color, prevColor, 0.7);
+        
+        // --- EDGE SMOOTHING (v3) ---
+        float blendFactor = 0.7;
+        if (pc.edgeSmoothing == 1) {
+            // Sharpen blend on edges, soften on surfaces
+            float centerDepth = texture(leftEyeDepth, uv).r;
+            float texelX = 1.0 / float(imageSize.x);
+            float nDepth = texture(leftEyeDepth, uv + vec2(texelX, 0)).r;
+            float edge = abs(centerDepth - nDepth);
+            blendFactor = mix(0.7, 0.3, clamp(edge * 100.0, 0.0, 1.0));
+        }
+        
+        color = mix(color, prevColor, blendFactor);
     }
     
     imageStore(rightEyeOutput, pixelCoord, vec4(color, 1.0));

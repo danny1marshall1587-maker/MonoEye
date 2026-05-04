@@ -21,6 +21,15 @@ struct Config {
     // Show a small green dot in the headset to indicate MonoEye is active
     bool show_indicator = true;
 
+    // Use NVIDIA Tensor Cores for advanced stabilization (requires NVIDIA GPU)
+    bool tensor_stabilization = false;
+
+    // Remove specular shimmering (fireflies)
+    bool specular_rejection = true;
+
+    // Smooth geometric edges using depth mask
+    bool edge_smoothing = true;
+
     // IPD override in meters (0.0 = use headset default)
     float ipd_override = 0.0f;
 
