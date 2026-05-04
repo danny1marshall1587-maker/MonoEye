@@ -260,6 +260,15 @@ namespace MonoEyeSwitcher
                     MessageBoxIcon.Information
                 );
             }
+            catch (Exception ex)
+            {
+                MessageBox.Show(
+                    $"Failed to change MonoEye status:\n\n{ex.Message}\n\nMake sure you are running as Administrator.",
+                    "Error",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error
+                );
+            }
         }
 
         private void RegisterOpenXRLayer(bool enable)
