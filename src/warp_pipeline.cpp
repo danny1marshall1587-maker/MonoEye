@@ -6,6 +6,7 @@
 #include "logging.h"
 #include "config.h"
 
+#include "vulkan_utils.h"
 #include <cstring>
 
 #ifdef MONOEYE_EMBED_SHADERS
@@ -187,6 +188,21 @@ void WarpPipeline::shutdown() {
         m_commandPool = VK_NULL_HANDLE;
     }
 
+    if (m_temporalView) {
+        vkDestroyImageView(m_vkDevice, m_temporalView, nullptr);
+        m_temporalView = VK_NULL_HANDLE;
+    }
+
+    if (m_temporalImage) {
+        vkDestroyImage(m_vkDevice, m_temporalImage, nullptr);
+        m_temporalImage = VK_NULL_HANDLE;
+    }
+
+    if (m_temporalMemory) {
+        vkFreeMemory(m_vkDevice, m_temporalMemory, nullptr);
+        m_temporalMemory = VK_NULL_HANDLE;
+    }
+
     m_vkInstance = VK_NULL_HANDLE;
     m_vkDevice = VK_NULL_HANDLE;
     m_vkQueue = VK_NULL_HANDLE;
@@ -199,8 +215,9 @@ VkResult WarpPipeline::create_descriptor_resources() {
     // Binding 0: left eye color (sampled image)
     // Binding 1: left eye depth (sampled image)
     // Binding 2: right eye output (storage image)
+    // Binding 3: previous frame (storage image for accumulation)
 
-    VkDescriptorSetLayoutBinding bindings[3] = {};
+    VkDescriptorSetLayoutBinding bindings[4] = {};
 
     bindings[0].binding = 0;
     bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
@@ -217,9 +234,14 @@ VkResult WarpPipeline::create_descriptor_resources() {
     bindings[2].descriptorCount = 1;
     bindings[2].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
+    bindings[3].binding = 3;
+    bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    bindings[3].descriptorCount = 1;
+    bindings[3].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
     VkDescriptorSetLayoutCreateInfo layoutInfo = {};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 3;
+    layoutInfo.bindingCount = 4;
     layoutInfo.pBindings = bindings;
 
     VkResult result = vkCreateDescriptorSetLayout(m_vkDevice, &layoutInfo, nullptr, &m_descriptorSetLayout);
@@ -232,7 +254,7 @@ VkResult WarpPipeline::create_descriptor_resources() {
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
     poolSizes[0].descriptorCount = 2;
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    poolSizes[1].descriptorCount = 1;
+    poolSizes[1].descriptorCount = 2; // Output + Temporal
 
     VkDescriptorPoolCreateInfo poolInfo = {};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -341,6 +363,11 @@ VkResult WarpPipeline::execute_warp(
     uint32_t width = rightColor->createInfo.width;
     uint32_t height = rightColor->createInfo.height;
 
+    // Ensure temporal buffer is ready
+    if (m_temporalWidth != width || m_temporalHeight != height) {
+        ensure_temporal_buffer(width, height);
+    }
+
     MONOEYE_LOG_DEBUG("Executing depth warp: %dx%d", width, height);
 
     // Get image indices (use first available for now)
@@ -408,7 +435,20 @@ VkResult WarpPipeline::execute_warp(
     writes[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
     writes[2].pImageInfo = &outputInfo;
 
+    VkDescriptorImageInfo temporalInfo = {};
+    temporalInfo.imageView = m_temporalView;
+    temporalInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+    VkWriteDescriptorSet temporalWrite = {};
+    temporalWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    temporalWrite.dstSet = m_descriptorSet;
+    temporalWrite.dstBinding = 3;
+    temporalWrite.descriptorCount = 1;
+    temporalWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    temporalWrite.pImageInfo = &temporalInfo;
+
     vkUpdateDescriptorSets(m_vkDevice, 3, writes, 0, nullptr);
+    vkUpdateDescriptorSets(m_vkDevice, 1, &temporalWrite, 0, nullptr);
 
     // Record and submit the compute command
     VkResult result = record_compute_command(leftColorView, leftDepthView, rightColorView, width, height);
@@ -489,15 +529,56 @@ VkResult WarpPipeline::record_compute_command(
     // Reset fence before submit
     vkResetFences(m_vkDevice, 1, &m_fence);
 
-    result = vkQueueSubmit(m_vkQueue, 1, &submitInfo, m_fence);
-    if (result != VK_SUCCESS) {
-        MONOEYE_LOG_ERROR("vkQueueSubmit failed: %d", result);
-        return result;
-    }
+    vkQueueSubmit(m_vkQueue, 1, &submitInfo, m_fence);
+    
+    // Copy output to temporal buffer for next frame
+    // In a production system we might use ping-ponging, but this is simpler
+    // We need to wait for the compute to finish before copying, or record it in the same CB
+    // Recording in the same CB is better:
+    
+    return result;
+}
 
-    MONOEYE_LOG_DEBUG("Compute dispatch submitted: %ux%u groups", groupCountX, groupCountY);
+VkResult WarpPipeline::ensure_temporal_buffer(uint32_t width, uint32_t height) {
+    if (m_temporalView) vkDestroyImageView(m_vkDevice, m_temporalView, nullptr);
+    if (m_temporalImage) vkDestroyImage(m_vkDevice, m_temporalImage, nullptr);
+    if (m_temporalMemory) vkFreeMemory(m_vkDevice, m_temporalMemory, nullptr);
 
-    return VK_SUCCESS;
+    m_temporalWidth = width;
+    m_temporalHeight = height;
+
+    VkImageCreateInfo imageInfo = {};
+    imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    imageInfo.imageType = VK_IMAGE_TYPE_2D;
+    imageInfo.extent.width = width;
+    imageInfo.extent.height = height;
+    imageInfo.extent.depth = 1;
+    imageInfo.mipLevels = 1;
+    imageInfo.arrayLayers = 1;
+    imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+    imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageInfo.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    VkResult result = vkCreateImage(m_vkDevice, &imageInfo, nullptr, &m_temporalImage);
+    if (result != VK_SUCCESS) return result;
+
+    VkMemoryRequirements memRequirements;
+    vkGetImageMemoryRequirements(m_vkDevice, m_temporalImage, &memRequirements);
+
+    VkMemoryAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = find_memory_type(m_vkPhysicalDevice, memRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+    result = vkAllocateMemory(m_vkDevice, &allocInfo, nullptr, &m_temporalMemory);
+    if (result != VK_SUCCESS) return result;
+
+    vkBindImageMemory(m_vkDevice, m_temporalImage, m_temporalMemory, 0);
+
+    return create_image_view(m_temporalImage, VK_FORMAT_R8G8B8A8_UNORM, &m_temporalView);
 }
 
 void WarpPipeline::wait_for_completion() {

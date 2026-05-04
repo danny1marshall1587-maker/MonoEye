@@ -78,6 +78,9 @@ private:
         uint32_t width,
         uint32_t height
     );
+    
+    // Ensure temporal buffer is allocated and matches dimensions
+    VkResult ensure_temporal_buffer(uint32_t width, uint32_t height);
 
     // Create a Vulkan image view for a VkImage
     VkResult create_image_view(VkImage image, VkFormat format, VkImageView* view);
@@ -102,6 +105,13 @@ private:
     // Synchronization
     VkSemaphore m_completionSemaphore = VK_NULL_HANDLE;
     VkFence m_fence = VK_NULL_HANDLE;
+
+    // Temporal stability resources
+    VkImage m_temporalImage = VK_NULL_HANDLE;
+    VkDeviceMemory m_temporalMemory = VK_NULL_HANDLE;
+    VkImageView m_temporalView = VK_NULL_HANDLE;
+    uint32_t m_temporalWidth = 0;
+    uint32_t m_temporalHeight = 0;
 
     // State
     bool m_initialized = false;

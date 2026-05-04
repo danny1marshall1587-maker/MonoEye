@@ -98,25 +98,41 @@ void main() {
             // Valid sample - use bilateral-like sampling for sharpness
             vec3 color = texture(leftEyeColor, shiftedUV).rgb;
             
-            // Apply temporal smoothing if we have frame index
+            // --- TEMPORAL STABILIZATION ---
             if (pc.frameIndex > 0) {
-                // Future: Add motion vector support for better temporal stability
+                // Simple Exponential Moving Average (EMA) for stability
+                // We sample the previous frame at the current pixel coord
+                // (Future: Use motion vectors to sample at the reprojected position)
+                vec3 prevColor = imageLoad(previousFrame, pixelCoord).rgb;
+                
+                // Only blend if the colors are somewhat similar (reject ghosting on fast motion)
+                float diff = distance(color, prevColor);
+                float blendFactor = clamp(1.0 - diff * 2.0, 0.5, 0.95);
+                
+                color = mix(color, prevColor, blendFactor);
             }
             
             imageStore(rightEyeOutput, pixelCoord, vec4(color, 1.0));
+            imageStore(previousFrame, pixelCoord, vec4(color, 1.0));
         }
         return;
     }
 
-    // Check if shifted UV is within bounds
+    // Default fast/balanced modes also get simple stabilization
+    vec3 color;
     if (shiftedUV.x >= 0.0 && shiftedUV.x <= 1.0) {
-        vec3 rightColor = texture(leftEyeColor, shiftedUV).rgb;
-        imageStore(rightEyeOutput, pixelCoord, vec4(rightColor, 1.0));
+        color = texture(leftEyeColor, shiftedUV).rgb;
     } else {
-        // Disocclusion zone - fill with nearest edge
-        vec3 fillColor = texture(leftEyeColor, vec2(clamp(shiftedUV.x, 0.0, 1.0), uv.y)).rgb;
-        imageStore(rightEyeOutput, pixelCoord, vec4(fillColor, 1.0));
+        color = texture(leftEyeColor, vec2(clamp(shiftedUV.x, 0.0, 1.0), uv.y)).rgb;
     }
+
+    if (pc.frameIndex > 0) {
+        vec3 prevColor = imageLoad(previousFrame, pixelCoord).rgb;
+        color = mix(color, prevColor, 0.7);
+    }
+    
+    imageStore(rightEyeOutput, pixelCoord, vec4(color, 1.0));
+    imageStore(previousFrame, pixelCoord, vec4(color, 1.0));
 
     // Draw indicator (small green dot in bottom-left)
     if (pc.showIndicator == 1) {

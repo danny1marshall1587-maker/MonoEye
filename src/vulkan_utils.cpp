@@ -1,6 +1,7 @@
 // Copyright (c) 2026 MonoEye Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+#include "vulkan_utils.h"
 #include "logging.h"
 #ifdef _WIN32
 #include <windows.h>
@@ -127,6 +128,19 @@ bool find_queue_families(
     }
 
     return foundGraphics && foundCompute && foundTransfer;
+}
+
+uint32_t find_memory_type(VkPhysicalDevice physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties) {
+    VkPhysicalDeviceMemoryProperties memProperties;
+    vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
+
+    for (uint32_t i = 0; i < memProperties.memoryTypeCount; ++i) {
+        if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+            return i;
+        }
+    }
+
+    return 0xFFFFFFFF;
 }
 
 // Helper to create a Vulkan buffer
