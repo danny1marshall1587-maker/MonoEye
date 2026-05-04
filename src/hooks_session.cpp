@@ -11,6 +11,7 @@
 #include <openxr/openxr_platform.h>
 
 #include <mutex>
+#include <unordered_map>
 
 namespace monoeye {
 

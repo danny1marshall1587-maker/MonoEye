@@ -6,6 +6,8 @@
 #include "dispatch_table.h"
 #include "config.h"
 #include <vector>
+#include <mutex>
+#include <unordered_map>
 
 namespace monoeye {
 

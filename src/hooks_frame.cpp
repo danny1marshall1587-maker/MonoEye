@@ -9,6 +9,8 @@
 #include "config.h"
 
 #include <vector>
+#include <mutex>
+#include <unordered_map>
 
 namespace monoeye {
 

@@ -23,6 +23,11 @@
     #define MONOEYE_CALL
 #endif
 
+// OpenXR configuration
+#ifndef XR_USE_GRAPHICS_API_VULKAN
+#define XR_USE_GRAPHICS_API_VULKAN
+#endif
+
 // OpenXR includes
 #include <openxr/openxr.h>
 #include <openxr/openxr_loader_negotiation.h>
