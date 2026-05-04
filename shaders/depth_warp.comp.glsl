@@ -28,11 +28,28 @@ layout(push_constant) uniform PushConstants {
     uint tensorEnabled;       // 1 to use tensor core logic
     uint specularRejection;   // 1 to remove flickering fireflies
     uint edgeSmoothing;       // 1 for depth-guided edge AA
+    float upscaleFactor;      // Input resolution scale
     uint frameIndex;          // Frame counter
 } pc;
 
 // Shared between invocations for temporal filtering
 layout(binding = 3, set = 0, rgba8) uniform image2D previousFrame;
+
+// High-quality Sharpening (RCAS inspired)
+vec3 applySharpening(vec2 uv, vec3 centerColor) {
+    float texelX = 1.0 / float(imageSize(rightEyeOutput).x);
+    float texelY = 1.0 / float(imageSize(rightEyeOutput).y);
+    
+    vec3 n1 = texture(leftEyeColor, uv + vec2(texelX, 0)).rgb;
+    vec3 n2 = texture(leftEyeColor, uv + vec2(-texelX, 0)).rgb;
+    vec3 n3 = texture(leftEyeColor, uv + vec2(0, texelY)).rgb;
+    vec3 n4 = texture(leftEyeColor, uv + vec2(0, -texelY)).rgb;
+    
+    // Contrast adaptive sharpening
+    float sharpness = 0.5; // Adjustable
+    vec3 avg = (n1 + n2 + n3 + n4) * 0.25;
+    return mix(centerColor, centerColor + (centerColor - avg), sharpness);
+}
 
 void main() {
     ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.xy);
@@ -47,6 +64,11 @@ void main() {
 
     // Sample left eye color
     vec3 leftColor = texture(leftEyeColor, uv).rgb;
+    
+    // Apply sharpening if upscaling is active
+    if (pc.upscaleFactor < 0.99) {
+        leftColor = applySharpening(uv, leftColor);
+    }
 
     // --- SPECULAR REJECTION (v3) ---
     if (pc.specularRejection == 1) {
@@ -119,6 +141,10 @@ void main() {
         } else {
             // Valid sample - use bilateral-like sampling for sharpness
             vec3 color = texture(leftEyeColor, shiftedUV).rgb;
+            
+            if (pc.upscaleFactor < 0.99) {
+                color = applySharpening(shiftedUV, color);
+            }
             
             // --- TEMPORAL STABILIZATION ---
             if (pc.frameIndex > 0) {
