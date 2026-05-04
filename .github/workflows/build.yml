@@ -117,6 +117,7 @@ jobs:
           mkdir -p release
           cp build/XR_APILAYER_NOVENDOR_monoeye.so release/
           cp manifest/XR_APILAYER_NOVENDOR_monoeye.json release/
+          cp scripts/install_linux.sh release/
           cp README.md release/
           cp LICENSE release/
           cd release && zip -r ../MonoEye-linux-x64.zip *
