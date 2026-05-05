@@ -165,6 +165,15 @@ add_library(monoeye SHARED
     ${GENERATED_DISPATCH_CPP}
 )
 
+# Build the OpenVR Proxy DLL
+add_library(openvr_api SHARED 
+    src/openvr_proxy/openvr_proxy.cpp
+    src/logging.cpp
+)
+target_include_directories(openvr_api PRIVATE external/openvr/headers)
+target_link_libraries(openvr_api PRIVATE Vulkan::Vulkan)
+set_target_properties(openvr_api PROPERTIES PREFIX "") # Remove 'lib' prefix
+
 if(MONOEYE_EMBED_SHADERS)
     target_sources(monoeye PRIVATE ${SHADER_HEADERS})
     target_compile_definitions(monoeye PRIVATE MONOEYE_EMBED_SHADERS=1)
