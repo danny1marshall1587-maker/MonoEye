@@ -11,6 +11,7 @@
 #include <cstdio>
 #include <cstdarg>
 #include <cstdlib>
+#include <cstring>
 #include <mutex>
 
 #include <chrono>
@@ -167,8 +168,5 @@ LogLevel get_log_level() {
     ensure_initialized();
     return s_log_level;
 }
-
-} // namespace monoeye
-
 
 } // namespace monoeye
