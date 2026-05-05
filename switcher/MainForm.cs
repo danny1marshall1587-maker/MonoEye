@@ -484,6 +484,9 @@ namespace MonoEyeSwitcher
             string jsonPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "XR_APILAYER_NOVENDOR_monoeye.json");
             string subKey = @"SOFTWARE\Khronos\OpenXR\1\ApiLayers\Implicit";
 
+            // Cleanup any old explicit registrations to prevent duplicates
+            CleanExplicitRegistrations(jsonPath);
+
             try
             {
                 if (enable)
@@ -535,6 +538,35 @@ namespace MonoEyeSwitcher
                     } catch {}
                 }
             }
+        }
+
+        private void CleanExplicitRegistrations(string jsonPath)
+        {
+            string explicitKey = @"SOFTWARE\Khronos\OpenXR\1\ApiLayers\Explicit";
+            
+            // Clean HKLM
+            try {
+                using (RegistryKey key = Registry.LocalMachine.OpenSubKey(explicitKey, true))
+                {
+                    if (key != null) key.DeleteValue(jsonPath, false);
+                }
+            } catch {}
+            
+            // Clean HKCU
+            try {
+                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(explicitKey, true))
+                {
+                    if (key != null) key.DeleteValue(jsonPath, false);
+                }
+            } catch {}
+            
+            // Clean WOW6432Node (32-bit compatibility)
+            try {
+                using (RegistryKey key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\WOW6432Node\Khronos\OpenXR\1\ApiLayers\Explicit", true))
+                {
+                    if (key != null) key.DeleteValue(jsonPath, false);
+                }
+            } catch {}
         }
 
         private void SaveButton_Click(object sender, EventArgs e)

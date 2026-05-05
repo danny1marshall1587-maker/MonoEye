@@ -43,3 +43,7 @@ switcher-output/
 # Release packages
 *.zip
 release/
+
+# Temp files
+*.o
+*.log
