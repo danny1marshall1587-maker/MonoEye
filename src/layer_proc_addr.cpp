@@ -170,7 +170,7 @@ XrResult LayerXrGetInstanceProcAddr(
 
     MONOEYE_LOG_DEBUG("xrGetInstanceProcAddr: %s", name);
 
-    // Check if this is a function we hook
+    // Check if this is a function we hook — return our override immediately
     for (int i = 0; s_hooked_functions[i].name != nullptr; ++i) {
         if (strcmp(name, s_hooked_functions[i].name) == 0) {
             *function = s_hooked_functions[i].function;
@@ -179,7 +179,15 @@ XrResult LayerXrGetInstanceProcAddr(
         }
     }
 
-    // Not a hooked function - get it from the next layer/runtime
+    // NOT a hooked function — pass COMPLETELY transparently to the real runtime.
+    // We MUST use g_nextGetInstanceProcAddr (the pointer given to us by the loader
+    // at layer creation time) rather than anything from our dispatch table, to
+    // avoid any chance of routing back to ourselves and causing an infinite loop.
+    if (monoeye::g_nextGetInstanceProcAddr) {
+        return monoeye::g_nextGetInstanceProcAddr(instance, name, function);
+    }
+
+    // Fallback: try the per-instance dispatch table
     XrGeneratedDispatchTable* dispatch = nullptr;
     {
         std::lock_guard<std::mutex> lock(g_instance_dispatch_mutex);
@@ -189,16 +197,14 @@ XrResult LayerXrGetInstanceProcAddr(
         }
     }
 
-    if (!dispatch) {
-        if (monoeye::g_nextGetInstanceProcAddr) {
-            return monoeye::g_nextGetInstanceProcAddr(instance, name, function);
-        }
-        MONOEYE_LOG_ERROR("No dispatch table found for instance %p", (void*)(uintptr_t)instance);
-        return XR_ERROR_HANDLE_INVALID;
+    if (dispatch && dispatch->nextGetInstanceProcAddr &&
+        dispatch->nextGetInstanceProcAddr != (PFN_xrGetInstanceProcAddr)LayerXrGetInstanceProcAddr) {
+        return dispatch->nextGetInstanceProcAddr(instance, name, function);
     }
 
-    // Call down to the next layer
-    return dispatch->nextGetInstanceProcAddr(instance, name, function);
+    MONOEYE_LOG_ERROR("xrGetInstanceProcAddr: no downstream handler for '%s'", name);
+    *function = nullptr;
+    return XR_ERROR_FUNCTION_UNSUPPORTED;
 }
 
 
