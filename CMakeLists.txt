@@ -154,15 +154,15 @@ set(MONOEYE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui/imgui_impl_vulkan.cpp
 )
 
-target_include_directories(monoeye PRIVATE 
-    ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui
-)
-
 # Build the API layer shared library
 add_library(monoeye SHARED
     ${MONOEYE_SOURCES}
     ${GENERATED_DISPATCH_H}
     ${GENERATED_DISPATCH_CPP}
+)
+
+target_include_directories(monoeye PRIVATE 
+    ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui
 )
 
 # Build the OpenVR Proxy DLL
