@@ -59,6 +59,7 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force -Path release
           Copy-Item build\Release\XR_APILAYER_NOVENDOR_monoeye.dll release\
+          Copy-Item build\Release\openvr_api.dll release\
           Copy-Item manifest\XR_APILAYER_NOVENDOR_monoeye.json release\
           Copy-Item README.md release\
           Copy-Item LICENSE release\
