@@ -62,9 +62,19 @@ public:
     VkInstance get_vk_instance() const { return m_vkInstance; }
     VkPhysicalDevice get_physical_device() const { return m_vkPhysicalDevice; }
 
+    enum class UpscaleMode {
+        Native,
+        FSR_Performance,
+        FSR_Balanced,
+        FSR_Quality,
+        FSR_UltraQuality
+    };
+
+    void set_upscale_mode(UpscaleMode mode) { m_upscaleMode = mode; }
+    
 private:
-    WarpPipeline();
-    ~WarpPipeline();
+    UpscaleMode m_upscaleMode = UpscaleMode::Native;
+    float m_fsrSharpness = 0.8f;
 
     // Non-copyable
     WarpPipeline(const WarpPipeline&) = delete;

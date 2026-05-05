@@ -145,31 +145,52 @@ void main() {
         } else {
             // Valid sample - use bilateral-like sampling for sharpness
             vec3 color = texture(leftEyeColor, shiftedUV).rgb;
+            float bestDepth = texture(leftEyeDepth, shiftedUV).r;
             
             if (pc.upscaleFactor < 0.99) {
                 color = applySharpening(shiftedUV, color, bestDepth);
             }
             
-        // --- TEMPORAL STABILIZATION ---
+        // --- FSR 3.1 TEMPORAL ACCUMULATION ---
         if (pc.frameIndex > 0) {
-            vec3 prevColor;
+            vec3 accumulatedColor;
+            float motionWeight = 1.0;
             
             if (pc.hasMotionBuffer == 1) {
-                // Use motion vectors to sample the previous frame at the reprojected position
                 vec2 motion = texture(motionVectors, shiftedUV).rg;
                 ivec2 prevPixelCoord = pixelCoord - ivec2(motion * vec2(imageSize));
-                prevColor = imageLoad(previousFrame, prevPixelCoord).rgb;
+                accumulatedColor = imageLoad(previousFrame, prevPixelCoord).rgb;
+                
+                // Motion-aware weight: boost history on slow motion, use current on fast motion
+                float motionLen = length(motion);
+                motionWeight = clamp(1.0 - motionLen * 100.0, 0.1, 0.9);
             } else {
-                // Fallback: Use current pixel coordinate
-                prevColor = imageLoad(previousFrame, pixelCoord).rgb;
+                accumulatedColor = imageLoad(previousFrame, pixelCoord).rgb;
+                motionWeight = 0.5; // High fallback blend
             }
             
-            // Only blend if the colors are somewhat similar (reject ghosting on fast motion)
-                float diff = distance(color, prevColor);
-                float blendFactor = clamp(1.0 - diff * 2.0, 0.5, 0.95);
-                
-                color = mix(color, prevColor, blendFactor);
+            // Anti-Flicker / Ghosting Rejection (FSR 3.1 style variance clipping)
+            // Calculate color variance in the current 3x3 neighborhood
+            vec3 m1 = vec3(0.0);
+            vec3 m2 = vec3(0.0);
+            for (int y = -1; y <= 1; y++) {
+                for (int x = -1; x <= 1; x++) {
+                    vec3 c = texture(leftEyeColor, shiftedUV + vec2(x, y) / vec2(imageSize)).rgb;
+                    m1 += c;
+                    m2 += c * c;
+                }
             }
+            vec3 mean = m1 / 9.0;
+            vec3 stddev = sqrt(max(vec3(0.0), m2 / 9.0 - mean * mean));
+            
+            // Clip history color to the current neighborhood's color space
+            vec3 minColor = mean - stddev * 1.5;
+            vec3 maxColor = mean + stddev * 1.5;
+            accumulatedColor = clamp(accumulatedColor, minColor, maxColor);
+            
+            // Final temporal blend
+            color = mix(accumulatedColor, color, 1.0 - motionWeight);
+        }
             
             imageStore(rightEyeOutput, pixelCoord, vec4(color, 1.0));
             imageStore(previousFrame, pixelCoord, vec4(color, 1.0));
