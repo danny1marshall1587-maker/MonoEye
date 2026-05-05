@@ -51,6 +51,7 @@ public:
     void untrack_swapchain(XrSwapchain swapchain);
 
     SwapchainImageInfo* get_info(XrSwapchain swapchain);
+    VkImageView get_current_view(SwapchainImageInfo* info);
 
     void analyze_frame_views(
         uint32_t layerCount,

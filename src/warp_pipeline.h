@@ -29,6 +29,8 @@ struct SwapchainImageInfo;
 class WarpPipeline {
 public:
     static WarpPipeline& get_instance();
+    WarpPipeline();
+    ~WarpPipeline();
 
     // Initialize with Vulkan device from the OpenXR session
     VkResult initialize(
@@ -127,6 +129,7 @@ private:
     VkImage m_temporalImage = VK_NULL_HANDLE;
     VkDeviceMemory m_temporalMemory = VK_NULL_HANDLE;
     VkImageView m_temporalView = VK_NULL_HANDLE;
+    VkSampler m_sampler = VK_NULL_HANDLE;
     uint32_t m_temporalWidth = 0;
     uint32_t m_temporalHeight = 0;
 

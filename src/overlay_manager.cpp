@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "overlay_manager.h"
+#include "warp_pipeline.h"
 #include "logging.h"
 #include "dispatch_table.h"
 #include "vulkan_utils.h"
@@ -85,7 +86,7 @@ void OverlayManager::initialize(XrInstance instance, XrSession session, VkDevice
     style.ScaleAllSizes(2.0f); // Make it big for VR
 
     ImGui_ImplVulkan_InitInfo init_info = {};
-    init_info.Instance = WarpPipeline::get_instance().get_vk_instance();
+    init_info.Instance = m_vkInstance;
     init_info.PhysicalDevice = physicalDevice;
     init_info.Device = m_vkDevice;
     init_info.QueueFamily = queueFamilyIndex;
@@ -93,9 +94,9 @@ void OverlayManager::initialize(XrInstance instance, XrSession session, VkDevice
     init_info.DescriptorPool = m_descriptorPool;
     init_info.MinImageCount = 2;
     init_info.ImageCount = (uint32_t)m_images.size();
-    init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+    init_info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
     
-    ImGui_ImplVulkan_Init(&init_info, VK_NULL_HANDLE);
+    ImGui_ImplVulkan_Init(&init_info);
 
     // 4. Initialize Quad Layer info
     m_quadLayer.type = XR_TYPE_COMPOSITION_LAYER_QUAD;

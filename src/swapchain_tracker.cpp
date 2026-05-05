@@ -238,8 +238,15 @@ void SwapchainTracker::reset_eye_assignments() {
     }
 }
 
+VkImageView SwapchainTracker::get_current_view(SwapchainImageInfo* info) {
+    if (!info || !info->isVulkan || info->vulkanImageViews.empty()) {
+        return VK_NULL_HANDLE;
+    }
+    return info->vulkanImageViews[0];
+}
+
 void SwapchainTracker::mark_as_depth(XrSwapchain swapchain) {
-    // Called from internal analysis
+    std::lock_guard<std::mutex> lock(m_mutex);
     auto it = m_swapchains.find(swapchain);
     if (it != m_swapchains.end()) {
         it->second.isDepth = true;
@@ -247,6 +254,7 @@ void SwapchainTracker::mark_as_depth(XrSwapchain swapchain) {
 }
 
 void SwapchainTracker::mark_as_left_eye(XrSwapchain swapchain) {
+    std::lock_guard<std::mutex> lock(m_mutex);
     auto it = m_swapchains.find(swapchain);
     if (it != m_swapchains.end()) {
         it->second.isLeftEye = true;
@@ -254,6 +262,7 @@ void SwapchainTracker::mark_as_left_eye(XrSwapchain swapchain) {
 }
 
 void SwapchainTracker::mark_as_right_eye(XrSwapchain swapchain) {
+    std::lock_guard<std::mutex> lock(m_mutex);
     auto it = m_swapchains.find(swapchain);
     if (it != m_swapchains.end()) {
         it->second.isRightEye = true;
