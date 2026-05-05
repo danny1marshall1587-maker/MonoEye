@@ -179,30 +179,33 @@ XrResult LayerXrGetInstanceProcAddr(
         }
     }
 
-    // NOT a hooked function — pass COMPLETELY transparently to the real runtime.
-    // We MUST use g_nextGetInstanceProcAddr (the pointer given to us by the loader
-    // at layer creation time) rather than anything from our dispatch table, to
-    // avoid any chance of routing back to ourselves and causing an infinite loop.
-    if (monoeye::g_nextGetInstanceProcAddr) {
-        return monoeye::g_nextGetInstanceProcAddr(instance, name, function);
-    }
+    // 1. Try the per-instance dispatch table FIRST. This is the most accurate
+    // way to find the "next" function in the chain for a specific instance.
+    if (instance != XR_NULL_HANDLE) {
+        XrGeneratedDispatchTable* dispatch = nullptr;
+        {
+            std::lock_guard<std::mutex> lock(g_instance_dispatch_mutex);
+            auto it = g_instance_dispatch_map.find(instance);
+            if (it != g_instance_dispatch_map.end()) {
+                dispatch = it->second;
+            }
+        }
 
-    // Fallback: try the per-instance dispatch table
-    XrGeneratedDispatchTable* dispatch = nullptr;
-    {
-        std::lock_guard<std::mutex> lock(g_instance_dispatch_mutex);
-        auto it = g_instance_dispatch_map.find(instance);
-        if (it != g_instance_dispatch_map.end()) {
-            dispatch = it->second;
+        if (dispatch && dispatch->nextGetInstanceProcAddr &&
+            dispatch->nextGetInstanceProcAddr != LayerXrGetInstanceProcAddr) {
+            return dispatch->nextGetInstanceProcAddr(instance, name, function);
         }
     }
 
-    if (dispatch && dispatch->nextGetInstanceProcAddr &&
-        dispatch->nextGetInstanceProcAddr != LayerXrGetInstanceProcAddr) {
-        return dispatch->nextGetInstanceProcAddr(instance, name, function);
+    // 2. Fallback to the global pointer (used for NULL instance calls or 
+    // if the instance isn't in our map yet).
+    if (monoeye::g_nextGetInstanceProcAddr &&
+        monoeye::g_nextGetInstanceProcAddr != LayerXrGetInstanceProcAddr) {
+        return monoeye::g_nextGetInstanceProcAddr(instance, name, function);
     }
 
-    MONOEYE_LOG_ERROR("xrGetInstanceProcAddr: no downstream handler for '%s'", name);
+    MONOEYE_LOG_ERROR("xrGetInstanceProcAddr: no downstream handler for '%s' (instance: %p)", 
+                      name, (void*)instance);
     *function = nullptr;
     return XR_ERROR_FUNCTION_UNSUPPORTED;
 }

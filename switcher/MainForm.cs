@@ -484,18 +484,28 @@ namespace MonoEyeSwitcher
             string jsonPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "XR_APILAYER_NOVENDOR_monoeye.json");
             string subKey = @"SOFTWARE\Khronos\OpenXR\1\ApiLayers\Implicit";
 
-
             try
             {
                 if (enable)
                 {
+                    // Try LocalMachine (preferred for EAC/Stability)
                     using (RegistryKey key = Registry.LocalMachine.CreateSubKey(subKey))
                     {
                         key.SetValue(jsonPath, 0, RegistryValueKind.DWord);
                     }
+                    
+                    // CRITICAL: Remove from CurrentUser if it exists there, 
+                    // otherwise the loader will load us twice and cause a crash loop.
+                    try {
+                        using (RegistryKey key = Registry.CurrentUser.OpenSubKey(subKey, true))
+                        {
+                            if (key != null) key.DeleteValue(jsonPath, false);
+                        }
+                    } catch {}
                 }
                 else
                 {
+                    // Disable: Remove from both
                     using (RegistryKey key = Registry.LocalMachine.OpenSubKey(subKey, true))
                     {
                         if (key != null) key.DeleteValue(jsonPath, false);
@@ -508,13 +518,21 @@ namespace MonoEyeSwitcher
             }
             catch (Exception)
             {
-                // Fallback to CurrentUser if LocalMachine fails
+                // Fallback to CurrentUser if LocalMachine fails (e.g. no admin)
                 if (enable)
                 {
                     using (RegistryKey key = Registry.CurrentUser.CreateSubKey(subKey))
                     {
                         key.SetValue(jsonPath, 0, RegistryValueKind.DWord);
                     }
+                    
+                    // Also try to clean up HKLM if we previously succeeded but now failed
+                    try {
+                        using (RegistryKey key = Registry.LocalMachine.OpenSubKey(subKey, true))
+                        {
+                            if (key != null) key.DeleteValue(jsonPath, false);
+                        }
+                    } catch {}
                 }
             }
         }
