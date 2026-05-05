@@ -103,11 +103,12 @@ extern "C" XrResult monoeye_xrDestroySwapchain(XrSwapchain swapchain) {
     {
         std::lock_guard<std::mutex> lock(g_instance_dispatch_mutex);
         for (const auto& pair : g_instance_dispatch_map) {
-            if (pair.second && pair.second->DestroySwapchain) {
+            if (pair.second && pair.second->xrDestroySwapchain) {
                 dispatch = pair.second;
                 break;
             }
         }
+
     }
 
     if (!dispatch || !dispatch->xrDestroySwapchain) {
@@ -129,11 +130,12 @@ extern "C" XrResult monoeye_xrEnumerateSwapchainImages(
     {
         std::lock_guard<std::mutex> lock(g_instance_dispatch_mutex);
         for (const auto& pair : g_instance_dispatch_map) {
-            if (pair.second && pair.second->EnumerateSwapchainImages) {
+            if (pair.second && pair.second->xrEnumerateSwapchainImages) {
                 dispatch = pair.second;
                 break;
             }
         }
+
     }
 
     if (!dispatch || !dispatch->xrEnumerateSwapchainImages) {
@@ -156,11 +158,12 @@ extern "C" XrResult monoeye_xrAcquireSwapchainImage(
     {
         std::lock_guard<std::mutex> lock(g_instance_dispatch_mutex);
         for (const auto& pair : g_instance_dispatch_map) {
-            if (pair.second && pair.second->AcquireSwapchainImage) {
+            if (pair.second && pair.second->xrAcquireSwapchainImage) {
                 dispatch = pair.second;
                 break;
             }
         }
+
     }
 
     if (!dispatch || !dispatch->xrAcquireSwapchainImage) {
@@ -179,11 +182,12 @@ extern "C" XrResult monoeye_xrWaitSwapchainImage(
     {
         std::lock_guard<std::mutex> lock(g_instance_dispatch_mutex);
         for (const auto& pair : g_instance_dispatch_map) {
-            if (pair.second && pair.second->WaitSwapchainImage) {
+            if (pair.second && pair.second->xrWaitSwapchainImage) {
                 dispatch = pair.second;
                 break;
             }
         }
+
     }
 
     if (!dispatch || !dispatch->xrWaitSwapchainImage) {
@@ -202,11 +206,12 @@ extern "C" XrResult monoeye_xrReleaseSwapchainImage(
     {
         std::lock_guard<std::mutex> lock(g_instance_dispatch_mutex);
         for (const auto& pair : g_instance_dispatch_map) {
-            if (pair.second && pair.second->ReleaseSwapchainImage) {
+            if (pair.second && pair.second->xrReleaseSwapchainImage) {
                 dispatch = pair.second;
                 break;
             }
         }
+
     }
 
     if (!dispatch || !dispatch->xrReleaseSwapchainImage) {

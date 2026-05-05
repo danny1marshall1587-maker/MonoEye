@@ -14,9 +14,15 @@ def parse_commands(xml_path):
     root = tree.getroot()
 
     commands = {}
+    aliases = {}
 
     for cmd_elem in root.findall('.//commands/command'):
-        if cmd_elem.get('alias'):
+        cmd_name = cmd_elem.get('name')
+        alias_name = cmd_elem.get('alias')
+        
+        if alias_name:
+            # This is an alias, we'll handle it after all base commands are parsed
+            aliases[cmd_name] = alias_name
             continue
 
         proto = cmd_elem.find('proto')
@@ -58,7 +64,13 @@ def parse_commands(xml_path):
             'params': params,
         }
 
+    # Now add aliases
+    for alias_name, target_name in aliases.items():
+        if target_name in commands:
+            commands[alias_name] = commands[target_name]
+
     return commands
+
 
 
 def generate_dispatch_header(commands, output_path):
