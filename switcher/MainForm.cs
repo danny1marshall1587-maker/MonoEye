@@ -618,9 +618,10 @@ namespace MonoEyeSwitcher
                         }
                     } else {
                         MessageBox.Show("Could not find 'openvr_api.dll' in the selected folder. Are you sure this is the right directory?", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    }
                 }
             }
+        }
+
         private void SaveLogButton_Click(object sender, EventArgs e)
         {
             try
