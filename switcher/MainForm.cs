@@ -352,14 +352,15 @@ namespace MonoEyeSwitcher
         private void CheckRegistryStatus()
         {
             string jsonPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "XR_APILAYER_NOVENDOR_monoeye.json");
-            using (RegistryKey key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Khronos\OpenXR\1\ApiLayers\Explicit"))
+            using (RegistryKey key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Khronos\OpenXR\1\ApiLayers\Implicit"))
             {
                 if (key != null && key.GetValue(jsonPath) != null) return;
             }
-            using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Khronos\OpenXR\1\ApiLayers\Explicit"))
+            using (RegistryKey key = Registry.CurrentUser.OpenSubKey(@"SOFTWARE\Khronos\OpenXR\1\ApiLayers\Implicit"))
             {
                 if (key != null && key.GetValue(jsonPath) != null) return;
             }
+
             
             if (isEnabled)
             {
@@ -406,7 +407,8 @@ namespace MonoEyeSwitcher
         private void RegisterOpenXRLayer(bool enable)
         {
             string jsonPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "XR_APILAYER_NOVENDOR_monoeye.json");
-            string subKey = @"SOFTWARE\Khronos\OpenXR\1\ApiLayers\Explicit";
+            string subKey = @"SOFTWARE\Khronos\OpenXR\1\ApiLayers\Implicit";
+
 
             try
             {
