@@ -50,15 +50,16 @@ extern "C" XrResult monoeye_xrCreateSwapchain(
         }
     }
 
-    if (!dispatch || !dispatch->CreateSwapchain) {
+    if (!dispatch || !dispatch->xrCreateSwapchain) {
         return XR_ERROR_RUNTIME_FAILURE;
     }
 
-    XrResult result = ((PFN_xrCreateSwapchain)dispatch->CreateSwapchain)(session, createInfo, swapchain);
+    XrResult result = ((PFN_xrCreateSwapchain)dispatch->xrCreateSwapchain)(session, createInfo, swapchain);
 
     if (result == XR_SUCCESS) {
         uint32_t imageCount = 0;
-        ((PFN_xrEnumerateSwapchainImages)dispatch->EnumerateSwapchainImages)(*swapchain, 0, &imageCount, nullptr);
+        ((PFN_xrEnumerateSwapchainImages)dispatch->xrEnumerateSwapchainImages)(*swapchain, 0, &imageCount, nullptr);
+
 
         if (imageCount > 0) {
             // Allocate Vulkan image array
@@ -74,12 +75,13 @@ extern "C" XrResult monoeye_xrCreateSwapchain(
             }
 
             uint32_t actualCount = 0;
-            ((PFN_xrEnumerateSwapchainImages)dispatch->EnumerateSwapchainImages)(
+            ((PFN_xrEnumerateSwapchainImages)dispatch->xrEnumerateSwapchainImages)(
                 *swapchain,
                 imageCount,
                 &actualCount,
                 reinterpret_cast<XrSwapchainImageBaseHeader*>(vkImages.data())
             );
+
 
             SwapchainTracker::get_instance().track_swapchain(
                 *swapchain, *createInfo, actualCount,
@@ -108,11 +110,12 @@ extern "C" XrResult monoeye_xrDestroySwapchain(XrSwapchain swapchain) {
         }
     }
 
-    if (!dispatch || !dispatch->DestroySwapchain) {
+    if (!dispatch || !dispatch->xrDestroySwapchain) {
         return XR_ERROR_RUNTIME_FAILURE;
     }
 
-    return ((PFN_xrDestroySwapchain)dispatch->DestroySwapchain)(swapchain);
+    return ((PFN_xrDestroySwapchain)dispatch->xrDestroySwapchain)(swapchain);
+
 }
 
 extern "C" XrResult monoeye_xrEnumerateSwapchainImages(
@@ -133,14 +136,15 @@ extern "C" XrResult monoeye_xrEnumerateSwapchainImages(
         }
     }
 
-    if (!dispatch || !dispatch->EnumerateSwapchainImages) {
+    if (!dispatch || !dispatch->xrEnumerateSwapchainImages) {
         return XR_ERROR_RUNTIME_FAILURE;
     }
 
-    return ((PFN_xrEnumerateSwapchainImages)dispatch->EnumerateSwapchainImages)(
+    return ((PFN_xrEnumerateSwapchainImages)dispatch->xrEnumerateSwapchainImages)(
         swapchain, swapchainImageCapacityInput,
         swapchainImageCountOutput, swapchainImages
     );
+
 }
 
 extern "C" XrResult monoeye_xrAcquireSwapchainImage(
@@ -159,11 +163,12 @@ extern "C" XrResult monoeye_xrAcquireSwapchainImage(
         }
     }
 
-    if (!dispatch || !dispatch->AcquireSwapchainImage) {
+    if (!dispatch || !dispatch->xrAcquireSwapchainImage) {
         return XR_ERROR_RUNTIME_FAILURE;
     }
 
-    return ((PFN_xrAcquireSwapchainImage)dispatch->AcquireSwapchainImage)(swapchain, acquireInfo, index);
+    return ((PFN_xrAcquireSwapchainImage)dispatch->xrAcquireSwapchainImage)(swapchain, acquireInfo, index);
+
 }
 
 extern "C" XrResult monoeye_xrWaitSwapchainImage(
@@ -181,11 +186,12 @@ extern "C" XrResult monoeye_xrWaitSwapchainImage(
         }
     }
 
-    if (!dispatch || !dispatch->WaitSwapchainImage) {
+    if (!dispatch || !dispatch->xrWaitSwapchainImage) {
         return XR_ERROR_RUNTIME_FAILURE;
     }
 
-    return ((PFN_xrWaitSwapchainImage)dispatch->WaitSwapchainImage)(swapchain, waitInfo);
+    return ((PFN_xrWaitSwapchainImage)dispatch->xrWaitSwapchainImage)(swapchain, waitInfo);
+
 }
 
 extern "C" XrResult monoeye_xrReleaseSwapchainImage(
@@ -203,11 +209,12 @@ extern "C" XrResult monoeye_xrReleaseSwapchainImage(
         }
     }
 
-    if (!dispatch || !dispatch->ReleaseSwapchainImage) {
+    if (!dispatch || !dispatch->xrReleaseSwapchainImage) {
         return XR_ERROR_RUNTIME_FAILURE;
     }
 
-    return ((PFN_xrReleaseSwapchainImage)dispatch->ReleaseSwapchainImage)(swapchain, releaseInfo);
+    return ((PFN_xrReleaseSwapchainImage)dispatch->xrReleaseSwapchainImage)(swapchain, releaseInfo);
+
 }
 
 } // namespace monoeye

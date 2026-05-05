@@ -86,18 +86,21 @@ def generate_dispatch_header(commands, output_path):
 namespace monoeye {
 
 struct XrGeneratedDispatchTable {
+    PFN_xrGetInstanceProcAddr nextGetInstanceProcAddr = nullptr;
+
 """)
 
         for cmd_name, cmd_info in sorted(commands.items()):
-            member_name = cmd_name[2:]
-            f.write(f"    PFN_xrVoidFunction {member_name} = nullptr;\n")
+            f.write(f"    PFN_xrVoidFunction {cmd_name} = nullptr;\n")
+
 
         f.write("""};
 
 // Helper macro to call a dispatch function with proper casting
 // Usage: MONOEYE_CALL_DISPATCH(dispatch, xrBeginFrame, (session, &frameBeginInfo))
 #define MONOEYE_CALL_DISPATCH(dispatch, fn, args) \\
-    ((PFN_##fn)(dispatch)->##fn##_2)(args)
+    ((PFN_##fn)(dispatch)->fn)(args)
+
 
 } // namespace monoeye
 """)
@@ -133,9 +136,9 @@ void GeneratedXrPopulateDispatchTable(
 """)
 
         for cmd_name, cmd_info in sorted(commands.items()):
-            member_name = cmd_name[2:]
             f.write(f'\n    get_instance_proc_addr(instance, "{cmd_name}", &proc_addr);\n')
-            f.write(f"    dispatch_table->{member_name} = proc_addr;\n")
+            f.write(f"    dispatch_table->{cmd_name} = proc_addr;\n")
+
 
         f.write("""
 }

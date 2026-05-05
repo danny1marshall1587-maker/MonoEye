@@ -32,17 +32,16 @@
 #include <openxr/openxr.h>
 #include <openxr/openxr_loader_negotiation.h>
 
-// Forward declarations
-namespace monoeye {
-
-struct InstanceState;
-
 // Layer negotiation entry point (must be C-exported)
 extern "C" MONOEYE_EXPORT XrResult xrNegotiateLoaderApiLayerInterface(
     const XrNegotiateLoaderInfo* loaderInfo,
     const char* apiLayerName,
     XrNegotiateApiLayerRequest* apiLayerRequest
 );
+
+namespace monoeye {
+
+struct InstanceState;
 
 // Internal layer functions (not exported directly)
 XrResult LayerXrCreateApiLayerInstance(

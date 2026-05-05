@@ -97,11 +97,12 @@ extern "C" XrResult monoeye_xrGetVulkanGraphicsRequirements2KHR(
         }
     }
 
-    if (!dispatch || !dispatch->GetVulkanGraphicsRequirementsKHR) {
+    if (!dispatch || !dispatch->xrGetVulkanGraphicsRequirements2KHR) {
         return XR_ERROR_RUNTIME_FAILURE;
     }
 
-    return ((PFN_xrGetVulkanGraphicsRequirements2KHR)dispatch->GetVulkanGraphicsRequirementsKHR)(instance, systemId, graphicsRequirements);
+    return ((PFN_xrGetVulkanGraphicsRequirements2KHR)dispatch->xrGetVulkanGraphicsRequirements2KHR)(instance, systemId, graphicsRequirements);
+
 }
 
 extern "C" XrResult monoeye_xrGetVulkanGraphicsDevice2KHR(
@@ -118,11 +119,12 @@ extern "C" XrResult monoeye_xrGetVulkanGraphicsDevice2KHR(
         }
     }
 
-    if (!dispatch || !dispatch->GetVulkanGraphicsDevice2KHR) {
+    if (!dispatch || !dispatch->xrGetVulkanGraphicsDevice2KHR) {
         return XR_ERROR_RUNTIME_FAILURE;
     }
 
-    return ((PFN_xrGetVulkanGraphicsDevice2KHR)dispatch->GetVulkanGraphicsDevice2KHR)(instance, getInfo, vkPhysicalDevice);
+    return ((PFN_xrGetVulkanGraphicsDevice2KHR)dispatch->xrGetVulkanGraphicsDevice2KHR)(instance, getInfo, vkPhysicalDevice);
+
 }
 
 namespace monoeye {
@@ -186,8 +188,8 @@ XrResult LayerXrGetInstanceProcAddr(
         return XR_ERROR_HANDLE_INVALID;
     }
 
-    *function = nullptr;
-    return XR_SUCCESS; // The loader handles passthrough for non-hooked functions
+    // Call down to the next layer
+    return dispatch->nextGetInstanceProcAddr(instance, name, function);
 }
 
 } // namespace monoeye

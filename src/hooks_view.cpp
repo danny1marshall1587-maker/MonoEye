@@ -34,9 +34,10 @@ extern "C" XrResult monoeye_xrEnumerateViewConfigurationViews(
                 dispatch = it->second;
             }
         }
-        if (!dispatch || !dispatch->EnumerateViewConfigurationViews) return XR_ERROR_RUNTIME_FAILURE;
-        return ((PFN_xrEnumerateViewConfigurationViews)dispatch->EnumerateViewConfigurationViews)(
+        if (!dispatch || !dispatch->xrEnumerateViewConfigurationViews) return XR_ERROR_RUNTIME_FAILURE;
+        return ((PFN_xrEnumerateViewConfigurationViews)dispatch->xrEnumerateViewConfigurationViews)(
             instance, systemId, viewConfigurationType, viewCapacityInput, viewCountOutput, views);
+
     }
 
     MONOEYE_LOG("xrEnumerateViewConfigurationViews: Intercepting for mono mode");
@@ -56,11 +57,12 @@ extern "C" XrResult monoeye_xrEnumerateViewConfigurationViews(
             dispatch = it->second;
         }
     }
-    if (!dispatch || !dispatch->EnumerateViewConfigurationViews) return XR_ERROR_RUNTIME_FAILURE;
+    if (!dispatch || !dispatch->xrEnumerateViewConfigurationViews) return XR_ERROR_RUNTIME_FAILURE;
 
     uint32_t realViewCount = 0;
-    XrResult result = ((PFN_xrEnumerateViewConfigurationViews)dispatch->EnumerateViewConfigurationViews)(
+    XrResult result = ((PFN_xrEnumerateViewConfigurationViews)dispatch->xrEnumerateViewConfigurationViews)(
         instance, systemId, viewConfigurationType, viewCapacityInput, &realViewCount, views);
+
 
     if (result == XR_SUCCESS) {
         *viewCountOutput = 1; // Lie to the app
@@ -99,13 +101,14 @@ extern "C" XrResult monoeye_xrLocateViews(
             dispatch = it->second;
         }
     }
-    if (!dispatch || !dispatch->LocateViews) return XR_ERROR_RUNTIME_FAILURE;
+    if (!dispatch || !dispatch->xrLocateViews) return XR_ERROR_RUNTIME_FAILURE;
 
     // Pass through if disabled
     if (!config.enabled || config.bypass_mode) {
-        return ((PFN_xrLocateViews)dispatch->LocateViews)(
+        return ((PFN_xrLocateViews)dispatch->xrLocateViews)(
             session, viewLocateInfo, viewState, viewCapacityInput, viewCountOutput, views);
     }
+
 
     // MONO MODE: Application only sees 1 view
     if (viewCapacityInput == 0) {
@@ -119,8 +122,9 @@ extern "C" XrResult monoeye_xrLocateViews(
     for (auto& v : realViews) v.type = XR_TYPE_VIEW;
 
     uint32_t realViewCount = 0;
-    XrResult result = ((PFN_xrLocateViews)dispatch->LocateViews)(
+    XrResult result = ((PFN_xrLocateViews)dispatch->xrLocateViews)(
         session, viewLocateInfo, viewState, 2, &realViewCount, realViews.data());
+
 
     if (result == XR_SUCCESS) {
         // Copy only the first view (Left eye) to the app

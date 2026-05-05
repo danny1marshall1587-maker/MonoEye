@@ -81,7 +81,9 @@ XrResult LayerXrCreateApiLayerInstance(
         return XR_ERROR_OUT_OF_MEMORY;
     }
 
+    nextDispatch->nextGetInstanceProcAddr = nextGetInstanceProcAddr;
     GeneratedXrPopulateDispatchTable(nextDispatch, *instance, nextGetInstanceProcAddr);
+
 
     {
         std::lock_guard<std::mutex> lock(g_instance_dispatch_mutex);
@@ -108,9 +110,10 @@ XrResult LayerXrDestroyInstance(XrInstance instance) {
 
     if (nextDispatch) {
         // Call down to destroy the instance
-        if (nextDispatch->DestroyInstance) {
-            ((PFN_xrDestroyInstance)nextDispatch->DestroyInstance)(instance);
+        if (nextDispatch->xrDestroyInstance) {
+            ((PFN_xrDestroyInstance)nextDispatch->xrDestroyInstance)(instance);
         }
+
 
         // Clean up the dispatch table
         MonoEyeCleanUpDispatchTable(nextDispatch);

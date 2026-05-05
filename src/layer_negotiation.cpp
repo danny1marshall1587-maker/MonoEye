@@ -6,7 +6,7 @@
 
 #include <cstring>
 
-namespace monoeye {
+} // namespace monoeye
 
 // The core negotiation function - this is the only function the loader calls
 // directly from our DLL via GetProcAddress. Everything else goes through
@@ -58,8 +58,8 @@ extern "C" MONOEYE_EXPORT XrResult xrNegotiateLoaderApiLayerInterface(
     // Fill in our capabilities
     apiLayerRequest->layerInterfaceVersion = XR_CURRENT_LOADER_API_LAYER_VERSION;
     apiLayerRequest->layerApiVersion = XR_CURRENT_API_VERSION;
-    apiLayerRequest->getInstanceProcAddr = LayerXrGetInstanceProcAddr;
-    apiLayerRequest->createApiLayerInstance = LayerXrCreateApiLayerInstance;
+    apiLayerRequest->getInstanceProcAddr = monoeye::LayerXrGetInstanceProcAddr;
+    apiLayerRequest->createApiLayerInstance = monoeye::LayerXrCreateApiLayerInstance;
 
     MONOEYE_LOG("Negotiation successful - interface version: %u, API version: %u",
                 apiLayerRequest->layerInterfaceVersion,
@@ -68,4 +68,3 @@ extern "C" MONOEYE_EXPORT XrResult xrNegotiateLoaderApiLayerInterface(
     return XR_SUCCESS;
 }
 
-} // namespace monoeye

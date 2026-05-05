@@ -199,7 +199,8 @@ XrSwapchain SwapchainTracker::get_or_create_right_swapchain(
     createInfo.usageFlags |= XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT | XR_SWAPCHAIN_USAGE_TRANSFER_DST_BIT;
     
     XrSwapchain rightSwapchain = XR_NULL_HANDLE;
-    XrResult result = ((PFN_xrCreateSwapchain)dispatch->CreateSwapchain)(session, &createInfo, &rightSwapchain);
+    XrResult result = ((PFN_xrCreateSwapchain)dispatch->xrCreateSwapchain)(session, &createInfo, &rightSwapchain);
+
 
     if (result != XR_SUCCESS) {
         MONOEYE_LOG_ERROR("Failed to create shadow swapchain: %d", result);
@@ -210,7 +211,8 @@ XrSwapchain SwapchainTracker::get_or_create_right_swapchain(
 
     // We also need to enumerate images to track it
     uint32_t imageCount = 0;
-    ((PFN_xrEnumerateSwapchainImages)dispatch->EnumerateSwapchainImages)(rightSwapchain, 0, &imageCount, nullptr);
+    ((PFN_xrEnumerateSwapchainImages)dispatch->xrEnumerateSwapchainImages)(rightSwapchain, 0, &imageCount, nullptr);
+
 
     if (imageCount > 0) {
         std::vector<XrSwapchainImageVulkanKHR> vkImages(imageCount);
@@ -220,12 +222,13 @@ XrSwapchain SwapchainTracker::get_or_create_right_swapchain(
         }
 
         uint32_t actualCount = 0;
-        ((PFN_xrEnumerateSwapchainImages)dispatch->EnumerateSwapchainImages)(
+        ((PFN_xrEnumerateSwapchainImages)dispatch->xrEnumerateSwapchainImages)(
             rightSwapchain,
             imageCount,
             &actualCount,
             reinterpret_cast<XrSwapchainImageBaseHeader*>(vkImages.data())
         );
+
 
         // Track it (but don't use the lock since we already have it)
         SwapchainImageInfo info;
