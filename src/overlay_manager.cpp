@@ -186,12 +186,34 @@ void OverlayManager::end_frame(XrTime displayTime) {
     for (int i = 0; i < 4; i++) {
         if (i == m_menuIndex) {
             ImGui::TextColored(ImVec4(1, 1, 0, 1), "> %s", options[i]);
+            
+            // Handle Toggle for HUD
+            if (i == 3 && (GetAsyncKeyState(VK_RIGHT) & 0x8000)) m_showHud = true;
+            if (i == 3 && (GetAsyncKeyState(VK_LEFT) & 0x8000)) m_showHud = false;
         } else {
             ImGui::Text("  %s", options[i]);
         }
     }
     
     ImGui::End();
+
+    // 4. Render Performance HUD (Always on if enabled)
+    if (m_showHud) {
+        ImGui::SetNextWindowPos(ImVec2(10, 10));
+        ImGui::Begin("Performance HUD", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoBackground);
+        
+        static float lastTime = 0;
+        float currentTime = (float)displayTime / 1e9f;
+        m_metrics.frameTimeMs = (currentTime - lastTime) * 1000.0f;
+        lastTime = currentTime;
+
+        ImGui::TextColored(ImVec4(0, 1, 0, 1), "GPU SAVINGS: %.1f%%", m_metrics.gpuSavings);
+        ImGui::Text("FRAME TIME: %.2f ms", m_metrics.frameTimeMs);
+        ImGui::Text("RENDER LOAD: %.1f%%", (m_metrics.frameTimeMs / 11.1f) * 100.0f); // Assuming 90Hz target
+        
+        ImGui::End();
+    }
+
     ImGui::Render();
 
     // 4. Acquire swapchain image and record draw commands

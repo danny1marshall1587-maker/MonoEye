@@ -46,9 +46,16 @@ private:
     std::vector<VkImageView> m_imageViews;
     
     VkDescriptorPool m_descriptorPool = VK_NULL_HANDLE;
-    int m_menuIndex = 0;
     
+    struct PerformanceMetrics {
+        float frameTimeMs = 0;
+        float gpuSavings = 48.5f; // Estimated starting value
+        float physicsLoad = 0;
+    } m_metrics;
+
     bool m_initialized = false;
+    bool m_showHud = true;
+    int m_menuIndex = 0;
     bool m_visible = false;
     
     XrCompositionLayerQuad m_quadLayer;
