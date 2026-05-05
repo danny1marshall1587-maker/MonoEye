@@ -89,7 +89,7 @@ private:
     // Record the compute command buffer
     VkResult record_compute_command(
         VkImageView leftColorView,
-        VkImageView leftDepthView,
+        VkImageView leftEyeDepthView,
         VkImageView leftMotionView,
         VkImageView rightColorView,
         uint32_t width,

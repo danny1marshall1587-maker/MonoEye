@@ -397,7 +397,7 @@ VkResult WarpPipeline::execute_warp(
 
     // Create image views
     VkImageView leftColorView = SwapchainTracker::get_instance().get_current_view(leftColor);
-    VkImageView leftDepthView = leftDepth ? SwapchainTracker::get_instance().get_current_view(leftDepth) : VK_NULL_HANDLE;
+    VkImageView leftEyeDepthView = leftDepth ? SwapchainTracker::get_instance().get_current_view(leftDepth) : VK_NULL_HANDLE;
     VkImageView leftMotionView = leftMotion ? SwapchainTracker::get_instance().get_current_view(leftMotion) : VK_NULL_HANDLE;
     VkImageView rightColorView = SwapchainTracker::get_instance().get_current_view(rightColor);
 
@@ -419,7 +419,7 @@ VkResult WarpPipeline::execute_warp(
     colorInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
     VkDescriptorImageInfo depthInfo = {};
-    depthInfo.imageView = leftDepth ? leftDepthView : leftColorView; // Fallback
+    depthInfo.imageView = leftDepth ? leftEyeDepthView : leftColorView; // Fallback
     depthInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
     VkDescriptorImageInfo outputInfo = {};
@@ -482,21 +482,21 @@ VkResult WarpPipeline::execute_warp(
     }
 
     // Record and submit the compute command
-    VkResult result = record_compute_command(leftColorView, leftDepthView, leftMotionView, rightColorView, width, height);
+    VkResult result = record_compute_command(leftColorView, leftEyeDepthView, leftMotionView, rightColorView, width, height);
 
     return result;
 }
 
 VkResult WarpPipeline::record_compute_command(
     VkImageView leftColorView,
-    VkImageView leftDepthView,
+    VkImageView leftEyeDepthView,
     VkImageView leftMotionView,
     VkImageView rightColorView,
     uint32_t width,
     uint32_t height
 ) {
     (void)leftColorView;
-    (void)leftDepthView;
+    (void)leftEyeDepthView;
     (void)rightColorView;
 
     // Begin command buffer recording
@@ -524,7 +524,7 @@ VkResult WarpPipeline::record_compute_command(
     pc.nearZ = 0.1f;    // Default near plane
     pc.farZ = 1000.0f;  // Default far plane
     pc.focalLength = 1.0f;
-    pc.hasDepthBuffer = leftDepthView ? 1 : 0;
+    pc.hasDepthBuffer = leftEyeDepthView ? 1 : 0;
     pc.hasMotionBuffer = leftMotionView ? 1 : 0;
     pc.qualityMode = (uint32_t)config.warp_quality;
     pc.showIndicator = config.show_indicator ? 1 : 0;
