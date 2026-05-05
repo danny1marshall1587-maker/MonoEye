@@ -50,7 +50,7 @@ extern "C" XrResult monoeye_xrBeginFrame(
         }
     }
 
-    if (!dispatch || !dispatch->BeginFrame) {
+    if (!dispatch || !dispatch->xrBeginFrame) {
         return XR_ERROR_RUNTIME_FAILURE;
     }
 
@@ -60,7 +60,7 @@ extern "C" XrResult monoeye_xrBeginFrame(
     // Wait for any pending warp operations to complete
     WarpPipeline::get_instance().wait_for_completion();
 
-    return ((PFN_xrBeginFrame)dispatch->BeginFrame)(session, frameBeginInfo);
+    return ((PFN_xrBeginFrame)dispatch->xrBeginFrame)(session, frameBeginInfo);
 
 }
 
@@ -90,11 +90,11 @@ extern "C" XrResult monoeye_xrEndFrame(
             dispatch = it->second;
         }
     }
-    if (!dispatch || !dispatch->EndFrame) return XR_ERROR_RUNTIME_FAILURE;
+    if (!dispatch || !dispatch->xrEndFrame) return XR_ERROR_RUNTIME_FAILURE;
 
     // Passthrough if disabled
     if (!config.enabled || config.bypass_mode) {
-        return ((PFN_xrEndFrame)dispatch->EndFrame)(session, frameEndInfo);
+        return ((PFN_xrEndFrame)dispatch->xrEndFrame)(session, frameEndInfo);
     }
 
 
@@ -200,7 +200,7 @@ extern "C" XrResult monoeye_xrEndFrame(
     modifiedFrameEndInfo.layerCount = (uint32_t)modifiedLayers.size();
     modifiedFrameEndInfo.layers = modifiedLayers.data();
 
-    return ((PFN_xrEndFrame)dispatch->EndFrame)(session, &modifiedFrameEndInfo);
+    return ((PFN_xrEndFrame)dispatch->xrEndFrame)(session, &modifiedFrameEndInfo);
 
 }
 

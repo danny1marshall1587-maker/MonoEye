@@ -89,43 +89,43 @@ XrResult LayerXrCreateApiLayerInstance(
 
     // Zero-initialise then resolve only what we need
     *nextDispatch = {};
-    nextDispatch->GetInstanceProcAddr = nextGetInstanceProcAddr;
+    nextDispatch->xrGetInstanceProcAddr = nextGetInstanceProcAddr;
 
     // Core functions MonoEye hooks call through to downstream
     nextGetInstanceProcAddr(*instance, "xrDestroyInstance",
-        (PFN_xrVoidFunction*)&nextDispatch->DestroyInstance);
+        (PFN_xrVoidFunction*)&nextDispatch->xrDestroyInstance);
     nextGetInstanceProcAddr(*instance, "xrCreateSession",
-        (PFN_xrVoidFunction*)&nextDispatch->CreateSession);
+        (PFN_xrVoidFunction*)&nextDispatch->xrCreateSession);
     nextGetInstanceProcAddr(*instance, "xrDestroySession",
-        (PFN_xrVoidFunction*)&nextDispatch->DestroySession);
+        (PFN_xrVoidFunction*)&nextDispatch->xrDestroySession);
     nextGetInstanceProcAddr(*instance, "xrEnumerateViewConfigurationViews",
-        (PFN_xrVoidFunction*)&nextDispatch->EnumerateViewConfigurationViews);
+        (PFN_xrVoidFunction*)&nextDispatch->xrEnumerateViewConfigurationViews);
     nextGetInstanceProcAddr(*instance, "xrLocateViews",
-        (PFN_xrVoidFunction*)&nextDispatch->LocateViews);
+        (PFN_xrVoidFunction*)&nextDispatch->xrLocateViews);
     nextGetInstanceProcAddr(*instance, "xrCreateSwapchain",
-        (PFN_xrVoidFunction*)&nextDispatch->CreateSwapchain);
+        (PFN_xrVoidFunction*)&nextDispatch->xrCreateSwapchain);
     nextGetInstanceProcAddr(*instance, "xrDestroySwapchain",
-        (PFN_xrVoidFunction*)&nextDispatch->DestroySwapchain);
+        (PFN_xrVoidFunction*)&nextDispatch->xrDestroySwapchain);
     nextGetInstanceProcAddr(*instance, "xrEnumerateSwapchainImages",
-        (PFN_xrVoidFunction*)&nextDispatch->EnumerateSwapchainImages);
+        (PFN_xrVoidFunction*)&nextDispatch->xrEnumerateSwapchainImages);
     nextGetInstanceProcAddr(*instance, "xrAcquireSwapchainImage",
-        (PFN_xrVoidFunction*)&nextDispatch->AcquireSwapchainImage);
+        (PFN_xrVoidFunction*)&nextDispatch->xrAcquireSwapchainImage);
     nextGetInstanceProcAddr(*instance, "xrWaitSwapchainImage",
-        (PFN_xrVoidFunction*)&nextDispatch->WaitSwapchainImage);
+        (PFN_xrVoidFunction*)&nextDispatch->xrWaitSwapchainImage);
     nextGetInstanceProcAddr(*instance, "xrReleaseSwapchainImage",
-        (PFN_xrVoidFunction*)&nextDispatch->ReleaseSwapchainImage);
+        (PFN_xrVoidFunction*)&nextDispatch->xrReleaseSwapchainImage);
     nextGetInstanceProcAddr(*instance, "xrBeginFrame",
-        (PFN_xrVoidFunction*)&nextDispatch->BeginFrame);
+        (PFN_xrVoidFunction*)&nextDispatch->xrBeginFrame);
     nextGetInstanceProcAddr(*instance, "xrEndFrame",
-        (PFN_xrVoidFunction*)&nextDispatch->EndFrame);
+        (PFN_xrVoidFunction*)&nextDispatch->xrEndFrame);
     nextGetInstanceProcAddr(*instance, "xrGetVulkanGraphicsRequirements2KHR",
-        (PFN_xrVoidFunction*)&nextDispatch->GetVulkanGraphicsRequirements2KHR);
+        (PFN_xrVoidFunction*)&nextDispatch->xrGetVulkanGraphicsRequirements2KHR);
     nextGetInstanceProcAddr(*instance, "xrGetVulkanGraphicsRequirementsKHR",
-        (PFN_xrVoidFunction*)&nextDispatch->GetVulkanGraphicsRequirementsKHR);
+        (PFN_xrVoidFunction*)&nextDispatch->xrGetVulkanGraphicsRequirementsKHR);
     nextGetInstanceProcAddr(*instance, "xrGetVulkanGraphicsDevice2KHR",
-        (PFN_xrVoidFunction*)&nextDispatch->GetVulkanGraphicsDevice2KHR);
+        (PFN_xrVoidFunction*)&nextDispatch->xrGetVulkanGraphicsDevice2KHR);
     nextGetInstanceProcAddr(*instance, "xrGetVulkanGraphicsDeviceKHR",
-        (PFN_xrVoidFunction*)&nextDispatch->GetVulkanGraphicsDeviceKHR);
+        (PFN_xrVoidFunction*)&nextDispatch->xrGetVulkanGraphicsDeviceKHR);
 
     {
         std::lock_guard<std::mutex> lock(g_instance_dispatch_mutex);
