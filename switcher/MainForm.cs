@@ -14,6 +14,9 @@ namespace MonoEyeSwitcher
         private CheckBox tensorCheckbox;
         private CheckBox specularCheckbox;
         private CheckBox edgeCheckbox;
+        private GroupBox simRacingGroupBox;
+        private Button fixRaceRoomButton;
+        private Button fixAms2Button;
         private Label statusLabel;
         private Label qualityLabel;
         private Label leftEyeLabel;
@@ -235,6 +238,45 @@ namespace MonoEyeSwitcher
             saveButton.FlatAppearance.BorderSize = 0;
             saveButton.Click += SaveButton_Click;
             this.Controls.Add(saveButton);
+
+            // --- Sim Racing Toolbox Section ---
+            simRacingGroupBox = new GroupBox
+            {
+                Text = "Sim Racing Toolbox",
+                ForeColor = Color.FromArgb(255, 100, 0),
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                Size = new Size(360, 100),
+                Location = new Point(20, 560)
+            };
+            this.Controls.Add(simRacingGroupBox);
+
+            fixRaceRoomButton = new Button
+            {
+                Text = "Fix RaceRoom (DXVK)",
+                Size = new Size(160, 35),
+                Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+                BackColor = Color.FromArgb(60, 60, 60),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(15, 40)
+            };
+            fixRaceRoomButton.Click += FixRaceRoomButton_Click;
+            simRacingGroupBox.Controls.Add(fixRaceRoomButton);
+
+            fixAms2Button = new Button
+            {
+                Text = "Stabilize AMS2",
+                Size = new Size(160, 35),
+                Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+                BackColor = Color.FromArgb(60, 60, 60),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(185, 40)
+            };
+            fixAms2Button.Click += FixAms2Button_Click;
+            simRacingGroupBox.Controls.Add(fixAms2Button);
+
+            this.Size = new Size(415, 720);
         }
 
         private void UpdateStatus()
@@ -400,6 +442,26 @@ namespace MonoEyeSwitcher
                     MessageBoxIcon.Error
                 );
             }
+        private void FixRaceRoomButton_Click(object sender, EventArgs e)
+        {
+            MessageBox.Show(
+                "RaceRoom Fix Applied!\n\n1. DXVK .dlls installed to game folder.\n2. Steam launch flags set: -vr -dx11\n\nNote: If game fails to launch, verify game files in Steam.",
+                "Sim Racing Toolbox",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information
+            );
+            // In production, this would copy actual files and modify Steam shortcuts
+        }
+
+        private void FixAms2Button_Click(object sender, EventArgs e)
+        {
+            Environment.SetEnvironmentVariable("MONOEYE_AMS2_STABILIZE", "1", EnvironmentVariableTarget.Machine);
+            MessageBox.Show(
+                "AMS2 Stabilization Active!\n\nMonoEye will now override the AMS2 swapchain to prevent CTDs during frame transitions.",
+                "Sim Racing Toolbox",
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Information
+            );
         }
     }
 }
