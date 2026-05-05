@@ -23,6 +23,7 @@ layout(push_constant) uniform PushConstants {
     float farZ;               // Far clip plane distance
     float focalLength;        // Focal length
     uint hasDepthBuffer;      // 1 if depth buffer is available
+    uint hasMotionBuffer;     // 1 if motion vectors are available
     uint qualityMode;         // 0=fast, 1=balanced, 2=quality
     uint showIndicator;       // 1 to show active indicator
     uint tensorEnabled;       // 1 to use tensor core logic
@@ -67,11 +68,11 @@ void main() {
 
     // Sample left eye color
     vec3 leftColor = texture(leftEyeColor, uv).rgb;
-    float depth = texture(leftEyeDepth, uv).r;
+    float depthRaw = texture(leftEyeDepth, uv).r;
     
     // Apply sharpening if upscaling is active
     if (pc.upscaleFactor < 0.99) {
-        leftColor = applySharpening(uv, leftColor, depth);
+        leftColor = applySharpening(uv, leftColor, depthRaw);
     }
 
     // --- SPECULAR REJECTION (v3) ---
