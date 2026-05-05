@@ -219,17 +219,15 @@ void OverlayManager::end_frame(XrTime displayTime) {
     // 4. Acquire swapchain image and record draw commands
     uint32_t imageIndex;
     xrAcquireSwapchainImage(m_swapchain, nullptr, &imageIndex);
-    // ...
     
     XrSwapchainImageWaitInfo waitInfo = {XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO};
     waitInfo.timeout = XR_INFINITE_DURATION;
     xrWaitSwapchainImage(m_swapchain, &waitInfo);
 
-    // 2. Render UI to m_imageViews[imageIndex]
-    // (Placeholder: Clear to semi-transparent blue for now)
-    // In v0.4.0 we'll use ImGui here
+    // Placeholder: We need a command buffer and a way to submit to the queue
+    // For alpha, we just release the image. Full rendering implementation follows in v0.5.1
+    // To ensure build passes, we keep it simple but safe.
 
-    // 3. Release swapchain image
     xrReleaseSwapchainImage(m_swapchain, nullptr);
 }
 
