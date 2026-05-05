@@ -58,24 +58,62 @@ void OverlayManager::initialize(XrInstance instance, XrSession session, VkDevice
         m_imageViews.push_back(view);
     }
 
-    // 3. Initialize Quad Layer info
+    // 2. Create Descriptor Pool for ImGui
+    VkDescriptorPoolSize pool_sizes[] = {
+        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1 }
+    };
+    VkDescriptorPoolCreateInfo pool_info = {};
+    pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    pool_info.maxSets = 1;
+    pool_info.poolSizeCount = (uint32_t)IM_ARRAYSIZE(pool_sizes);
+    pool_info.pPoolSizes = pool_sizes;
+    vkCreateDescriptorPool(m_vkDevice, &pool_info, nullptr, &m_descriptorPool);
+
+    // 3. Initialize ImGui
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO();
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+
+    ImGui::StyleColorsDark();
+    
+    // Customize style for VR (high contrast, large text)
+    ImGuiStyle& style = ImGui::GetStyle();
+    style.WindowRounding = 8.0f;
+    style.FrameRounding = 4.0f;
+    style.ScaleAllSizes(2.0f); // Make it big for VR
+
+    ImGui_ImplVulkan_InitInfo init_info = {};
+    init_info.Instance = WarpPipeline::get_instance().get_vk_instance();
+    init_info.PhysicalDevice = physicalDevice;
+    init_info.Device = m_vkDevice;
+    init_info.QueueFamily = queueFamilyIndex;
+    init_info.Queue = queue;
+    init_info.DescriptorPool = m_descriptorPool;
+    init_info.MinImageCount = 2;
+    init_info.ImageCount = (uint32_t)m_images.size();
+    init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+    
+    ImGui_ImplVulkan_Init(&init_info, VK_NULL_HANDLE);
+
+    // 4. Initialize Quad Layer info
     m_quadLayer.type = XR_TYPE_COMPOSITION_LAYER_QUAD;
     m_quadLayer.next = nullptr;
     m_quadLayer.layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT;
-    m_quadLayer.space = XR_NULL_HANDLE; // Will be set per frame (usually Reference Space)
+    m_quadLayer.space = XR_NULL_HANDLE; 
     m_quadLayer.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
     m_quadLayer.subImage.swapchain = m_swapchain;
     m_quadLayer.subImage.imageRect.offset = {0, 0};
     m_quadLayer.subImage.imageRect.extent = {1024, 1024};
     m_quadLayer.subImage.imageArrayIndex = 0;
     
-    // Position: 1.5 meters in front of user
     m_quadLayer.pose.orientation = {0, 0, 0, 1};
     m_quadLayer.pose.position = {0, 0, -1.5f};
-    m_quadLayer.size = {1.0f, 1.0f}; // 1 meter wide/high
+    m_quadLayer.size = {1.0f, 1.0f};
 
     m_initialized = true;
-    m_visible = false; // Start hidden
+    m_visible = false; 
 }
 
 void OverlayManager::shutdown() {
@@ -100,12 +138,66 @@ void OverlayManager::begin_frame() {
     // ImGui NewFrame logic will go here
 }
 
-void OverlayManager::end_frame(XrTime displayTime) {
-    if (!m_initialized || !m_visible) return;
+#include <windows.h>
 
-    // 1. Acquire swapchain image
+void OverlayManager::end_frame(XrTime displayTime) {
+    if (!m_initialized) return;
+
+    // 1. Handle Keyboard Input
+    static bool homeWasDown = false;
+    bool homeIsDown = (GetAsyncKeyState(VK_HOME) & 0x8000) != 0;
+    
+    if (homeIsDown && !homeWasDown) {
+        m_visible = !m_visible;
+        MONOEYE_LOG("Overlay visibility toggled: %s", m_visible ? "ON" : "OFF");
+    }
+    homeWasDown = homeIsDown;
+
+    if (!m_visible) return;
+
+    // 2. Handle Menu Navigation (Arrows)
+    if (m_visible) {
+        static float lastKeyTime = 0;
+        float currentTime = (float)displayTime / 1e9f;
+        
+        if (currentTime - lastKeyTime > 0.15f) { // Cooldown for keys
+            if (GetAsyncKeyState(VK_UP) & 0x8000) { m_menuIndex = (m_menuIndex - 1 + 4) % 4; lastKeyTime = currentTime; }
+            if (GetAsyncKeyState(VK_DOWN) & 0x8000) { m_menuIndex = (m_menuIndex + 1) % 4; lastKeyTime = currentTime; }
+            
+            // Left/Right to adjust values (Placeholder logic)
+            if (GetAsyncKeyState(VK_LEFT) & 0x8000) { /* Decrease current setting */ lastKeyTime = currentTime; }
+            if (GetAsyncKeyState(VK_RIGHT) & 0x8000) { /* Increase current setting */ lastKeyTime = currentTime; }
+        }
+    }
+
+    // 3. Render ImGui Menu
+    ImGui_ImplVulkan_NewFrame();
+    ImGui::NewFrame();
+
+    ImGui::SetNextWindowPos(ImVec2(100, 100));
+    ImGui::SetNextWindowSize(ImVec2(824, 824));
+    ImGui::Begin("MonoEye Universal Suite v0.4.0", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground);
+    
+    ImGui::TextColored(ImVec4(0, 1, 1, 1), "MONOEYE ADVANCED CLARITY");
+    ImGui::Separator();
+    ImGui::Spacing();
+
+    const char* options[] = { "FSR Scaling", "Specular Rejection", "Edge Smoothing", "Performance HUD" };
+    for (int i = 0; i < 4; i++) {
+        if (i == m_menuIndex) {
+            ImGui::TextColored(ImVec4(1, 1, 0, 1), "> %s", options[i]);
+        } else {
+            ImGui::Text("  %s", options[i]);
+        }
+    }
+    
+    ImGui::End();
+    ImGui::Render();
+
+    // 4. Acquire swapchain image and record draw commands
     uint32_t imageIndex;
     xrAcquireSwapchainImage(m_swapchain, nullptr, &imageIndex);
+    // ...
     
     XrSwapchainImageWaitInfo waitInfo = {XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO};
     waitInfo.timeout = XR_INFINITE_DURATION;

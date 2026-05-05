@@ -7,6 +7,8 @@
 #include <vulkan/vulkan.h>
 #include <vector>
 #include <memory>
+#include "imgui.h"
+#include "imgui_impl_vulkan.h"
 
 namespace monoeye {
 
@@ -42,6 +44,9 @@ private:
     XrSwapchain m_swapchain = XR_NULL_HANDLE;
     std::vector<VkImage> m_images;
     std::vector<VkImageView> m_imageViews;
+    
+    VkDescriptorPool m_descriptorPool = VK_NULL_HANDLE;
+    int m_menuIndex = 0;
     
     bool m_initialized = false;
     bool m_visible = false;

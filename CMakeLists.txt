@@ -147,6 +147,15 @@ set(MONOEYE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/logging.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/vulkan_utils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/overlay_manager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui/imgui.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui/imgui_draw.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui/imgui_widgets.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui/imgui_tables.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui/imgui_impl_vulkan.cpp
+)
+
+target_include_directories(monoeye PRIVATE 
+    ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui
 )
 
 # Build the API layer shared library
