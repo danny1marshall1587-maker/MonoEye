@@ -23,6 +23,10 @@ namespace MonoEyeSwitcher
         private Label titleLabel;
         private Label infoLabel;
         private Label openVrLabel;
+        private Button fixAms2Button;
+        private GroupBox openVrInstallerGroupBox;
+        private Button selectGameFolderButton;
+        private Label gameFolderLabel;
         private Button saveButton;
 
         private bool isEnabled = false;
@@ -276,7 +280,42 @@ namespace MonoEyeSwitcher
             fixAms2Button.Click += FixAms2Button_Click;
             simRacingGroupBox.Controls.Add(fixAms2Button);
 
-            this.Size = new Size(415, 720);
+            // --- OpenVR Installer Section ---
+            openVrInstallerGroupBox = new GroupBox
+            {
+                Text = "Universal OpenVR Installer (SteamVR)",
+                ForeColor = Color.FromArgb(0, 200, 255),
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                Size = new Size(360, 100),
+                Location = new Point(20, 680)
+            };
+            this.Controls.Add(openVrInstallerGroupBox);
+
+            selectGameFolderButton = new Button
+            {
+                Text = "Select Game Folder & Install",
+                Size = new Size(330, 35),
+                Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+                BackColor = Color.FromArgb(60, 60, 60),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(15, 30)
+            };
+            selectGameFolderButton.Click += SelectGameFolderButton_Click;
+            openVrInstallerGroupBox.Controls.Add(selectGameFolderButton);
+
+            gameFolderLabel = new Label
+            {
+                Text = "Select folder containing openvr_api.dll",
+                Font = new Font("Segoe UI", 7F),
+                ForeColor = Color.Gray,
+                Location = new Point(15, 70),
+                Size = new Size(330, 20),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+            openVrInstallerGroupBox.Controls.Add(gameFolderLabel);
+
+            this.Size = new Size(415, 820);
         }
 
         private void UpdateStatus()
@@ -461,7 +500,41 @@ namespace MonoEyeSwitcher
                 "Sim Racing Toolbox",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information
-            );
+        private void SelectGameFolderButton_Click(object sender, EventArgs e)
+        {
+            using (var fbd = new FolderBrowserDialog())
+            {
+                fbd.Description = "Select the folder containing the game's .exe and openvr_api.dll";
+                if (fbd.ShowDialog() == DialogResult.OK)
+                {
+                    string path = fbd.SelectedPath;
+                    string targetDll = System.IO.Path.Combine(path, "openvr_api.dll");
+                    string backupDll = System.IO.Path.Combine(path, "openvr_api_real.dll");
+
+                    if (System.IO.File.Exists(targetDll))
+                    {
+                        try {
+                            // 1. Backup original if not already done
+                            if (!System.IO.File.Exists(backupDll)) {
+                                System.IO.File.Move(targetDll, backupDll);
+                            }
+
+                            // 2. Copy our proxy (Assuming it's in the same folder as the switcher)
+                            string proxySource = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "openvr_api.dll");
+                            if (System.IO.File.Exists(proxySource)) {
+                                System.IO.File.Copy(proxySource, targetDll, true);
+                                MessageBox.Show($"Successfully installed MonoEye Proxy to:\n{path}", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            } else {
+                                MessageBox.Show("Could not find 'openvr_api.dll' proxy in Switcher folder. Please make sure all files are extracted.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            }
+                        } catch (Exception ex) {
+                            MessageBox.Show($"Installation failed: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        }
+                    } else {
+                        MessageBox.Show("Could not find 'openvr_api.dll' in the selected folder. Are you sure this is the right directory?", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
+                }
+            }
         }
     }
 }
