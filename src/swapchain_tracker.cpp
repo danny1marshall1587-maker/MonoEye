@@ -199,7 +199,7 @@ XrSwapchain SwapchainTracker::get_or_create_right_swapchain(
     createInfo.usageFlags |= XR_SWAPCHAIN_USAGE_SAMPLED_BIT | XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT | XR_SWAPCHAIN_USAGE_TRANSFER_DST_BIT;
     
     XrSwapchain rightSwapchain = XR_NULL_HANDLE;
-    XrResult result = ((PFN_xrCreateSwapchain)dispatch->xrCreateSwapchain)(session, &createInfo, &rightSwapchain);
+    XrResult result = ((PFN_xrCreateSwapchain)dispatch->CreateSwapchain)(session, &createInfo, &rightSwapchain);
 
 
     if (result != XR_SUCCESS) {
@@ -211,7 +211,7 @@ XrSwapchain SwapchainTracker::get_or_create_right_swapchain(
 
     // We also need to enumerate images to track it
     uint32_t imageCount = 0;
-    ((PFN_xrEnumerateSwapchainImages)dispatch->xrEnumerateSwapchainImages)(rightSwapchain, 0, &imageCount, nullptr);
+    ((PFN_xrEnumerateSwapchainImages)dispatch->EnumerateSwapchainImages)(rightSwapchain, 0, &imageCount, nullptr);
 
 
     if (imageCount > 0) {
@@ -222,7 +222,7 @@ XrSwapchain SwapchainTracker::get_or_create_right_swapchain(
         }
 
         uint32_t actualCount = 0;
-        ((PFN_xrEnumerateSwapchainImages)dispatch->xrEnumerateSwapchainImages)(
+        ((PFN_xrEnumerateSwapchainImages)dispatch->EnumerateSwapchainImages)(
             rightSwapchain,
             imageCount,
             &actualCount,

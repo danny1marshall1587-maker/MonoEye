@@ -47,7 +47,7 @@ void OverlayManager::initialize(XrInstance instance, XrSession session, VkDevice
     swapchainInfo.arraySize = 1;
     swapchainInfo.mipCount = 1;
 
-    XrResult result = ((PFN_xrCreateSwapchain)m_dispatch->xrCreateSwapchain)(m_xrSession, &swapchainInfo, &m_swapchain);
+    XrResult result = ((PFN_xrCreateSwapchain)m_dispatch->CreateSwapchain)(m_xrSession, &swapchainInfo, &m_swapchain);
 
 
 
@@ -58,9 +58,9 @@ void OverlayManager::initialize(XrInstance instance, XrSession session, VkDevice
 
     // 2. Get swapchain images
     uint32_t imageCount = 0;
-    ((PFN_xrEnumerateSwapchainImages)m_dispatch->xrEnumerateSwapchainImages)(m_swapchain, 0, &imageCount, nullptr);
+    ((PFN_xrEnumerateSwapchainImages)m_dispatch->EnumerateSwapchainImages)(m_swapchain, 0, &imageCount, nullptr);
     std::vector<XrSwapchainImageVulkanKHR> images(imageCount, {XR_TYPE_SWAPCHAIN_IMAGE_VULKAN_KHR});
-    ((PFN_xrEnumerateSwapchainImages)m_dispatch->xrEnumerateSwapchainImages)(m_swapchain, imageCount, &imageCount, (XrSwapchainImageBaseHeader*)images.data());
+    ((PFN_xrEnumerateSwapchainImages)m_dispatch->EnumerateSwapchainImages)(m_swapchain, imageCount, &imageCount, (XrSwapchainImageBaseHeader*)images.data());
 
 
 
@@ -149,7 +149,7 @@ void OverlayManager::shutdown() {
     m_images.clear();
 
     if (m_swapchain && m_dispatch) {
-        ((PFN_xrDestroySwapchain)m_dispatch->xrDestroySwapchain)(m_swapchain);
+        ((PFN_xrDestroySwapchain)m_dispatch->DestroySwapchain)(m_swapchain);
 
 
 
@@ -272,19 +272,19 @@ void OverlayManager::end_frame(XrTime displayTime) {
 
     // 4. Acquire swapchain image and record draw commands
     uint32_t imageIndex;
-    ((PFN_xrAcquireSwapchainImage)m_dispatch->xrAcquireSwapchainImage)(m_swapchain, nullptr, &imageIndex);
+    ((PFN_xrAcquireSwapchainImage)m_dispatch->AcquireSwapchainImage)(m_swapchain, nullptr, &imageIndex);
 
     
     XrSwapchainImageWaitInfo waitInfo = {XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO};
     waitInfo.timeout = XR_INFINITE_DURATION;
-    ((PFN_xrWaitSwapchainImage)m_dispatch->xrWaitSwapchainImage)(m_swapchain, &waitInfo);
+    ((PFN_xrWaitSwapchainImage)m_dispatch->WaitSwapchainImage)(m_swapchain, &waitInfo);
 
     
     // Placeholder: We need a command buffer and a way to submit to the queue
     // For alpha, we just release the image. Full rendering implementation follows in v0.5.1
     // To ensure build passes, we keep it simple but safe.
 
-    ((PFN_xrReleaseSwapchainImage)m_dispatch->xrReleaseSwapchainImage)(m_swapchain, nullptr);
+    ((PFN_xrReleaseSwapchainImage)m_dispatch->ReleaseSwapchainImage)(m_swapchain, nullptr);
 
 
 

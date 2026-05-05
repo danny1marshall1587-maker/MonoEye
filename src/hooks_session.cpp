@@ -34,13 +34,13 @@ monoeye_xrCreateSession(XrInstance instance,
     }
   }
 
-  if (!dispatch || !dispatch->xrCreateSession) {
+  if (!dispatch || !dispatch->CreateSession) {
     MONOEYE_LOG_ERROR("No dispatch table or CreateSession function");
     return XR_ERROR_RUNTIME_FAILURE;
   }
 
   // Call down to create the session
-  XrResult result = ((PFN_xrCreateSession)dispatch->xrCreateSession)(
+  XrResult result = ((PFN_xrCreateSession)dispatch->CreateSession)(
       instance, createInfo, session);
 
   if (result != XR_SUCCESS) {
@@ -81,13 +81,13 @@ monoeye_xrCreateSession(XrInstance instance,
           getInfo.systemId = createInfo->systemId;
           getInfo.vulkanInstance = vb->instance;
 
-          if (dispatch->xrGetVulkanGraphicsDevice2KHR) {
+          if (dispatch->GetVulkanGraphicsDevice2KHR) {
             ((PFN_xrGetVulkanGraphicsDevice2KHR)
-                 dispatch->xrGetVulkanGraphicsDevice2KHR)(instance, &getInfo,
+                 dispatch->GetVulkanGraphicsDevice2KHR)(instance, &getInfo,
                                                           &physicalDevice);
-          } else if (dispatch->xrGetVulkanGraphicsDeviceKHR) {
+          } else if (dispatch->GetVulkanGraphicsDeviceKHR) {
             ((PFN_xrGetVulkanGraphicsDeviceKHR)
-                 dispatch->xrGetVulkanGraphicsDeviceKHR)(instance, createInfo->systemId, vb->instance, &physicalDevice);
+                 dispatch->GetVulkanGraphicsDeviceKHR)(instance, createInfo->systemId, vb->instance, &physicalDevice);
           }
 
 
@@ -137,11 +137,11 @@ extern "C" XrResult monoeye_xrDestroySession(XrSession session) {
     }
   }
 
-  if (!dispatch || !dispatch->xrDestroySession) {
+  if (!dispatch || !dispatch->DestroySession) {
     return XR_ERROR_RUNTIME_FAILURE;
   }
 
-  return ((PFN_xrDestroySession)dispatch->xrDestroySession)(session);
+  return ((PFN_xrDestroySession)dispatch->DestroySession)(session);
 }
 
 } // namespace monoeye

@@ -99,11 +99,11 @@ extern "C" XrResult monoeye_xrGetVulkanGraphicsRequirements2KHR(
         }
     }
 
-    if (!dispatch || !dispatch->xrGetVulkanGraphicsRequirements2KHR) {
+    if (!dispatch || !dispatch->GetVulkanGraphicsRequirements2KHR) {
         return XR_ERROR_RUNTIME_FAILURE;
     }
 
-    return ((PFN_xrGetVulkanGraphicsRequirements2KHR)dispatch->xrGetVulkanGraphicsRequirements2KHR)(instance, systemId, graphicsRequirements);
+    return ((PFN_xrGetVulkanGraphicsRequirements2KHR)dispatch->GetVulkanGraphicsRequirements2KHR)(instance, systemId, graphicsRequirements);
 
 }
 
@@ -122,11 +122,11 @@ extern "C" XrResult monoeye_xrGetVulkanGraphicsDevice2KHR(
         }
     }
 
-    if (!dispatch || !dispatch->xrGetVulkanGraphicsDevice2KHR) {
+    if (!dispatch || !dispatch->GetVulkanGraphicsDevice2KHR) {
         return XR_ERROR_RUNTIME_FAILURE;
     }
 
-    return ((PFN_xrGetVulkanGraphicsDevice2KHR)dispatch->xrGetVulkanGraphicsDevice2KHR)(instance, getInfo, vkPhysicalDevice);
+    return ((PFN_xrGetVulkanGraphicsDevice2KHR)dispatch->GetVulkanGraphicsDevice2KHR)(instance, getInfo, vkPhysicalDevice);
 
 }
 
@@ -197,9 +197,9 @@ XrResult LayerXrGetInstanceProcAddr(
         }
     }
 
-    if (dispatch && dispatch->nextGetInstanceProcAddr &&
-        dispatch->nextGetInstanceProcAddr != (PFN_xrGetInstanceProcAddr)LayerXrGetInstanceProcAddr) {
-        return dispatch->nextGetInstanceProcAddr(instance, name, function);
+    if (dispatch && dispatch->GetInstanceProcAddr &&
+        dispatch->GetInstanceProcAddr != (PFN_xrGetInstanceProcAddr)LayerXrGetInstanceProcAddr) {
+        return dispatch->GetInstanceProcAddr(instance, name, function);
     }
 
     MONOEYE_LOG_ERROR("xrGetInstanceProcAddr: no downstream handler for '%s'", name);

@@ -30,18 +30,18 @@ extern "C" XrResult monoeye_xrEnumerateViewConfigurationViews(
             dispatch = it->second;
         }
     }
-    if (!dispatch || !dispatch->xrEnumerateViewConfigurationViews) return XR_ERROR_RUNTIME_FAILURE;
+    if (!dispatch || !dispatch->EnumerateViewConfigurationViews) return XR_ERROR_RUNTIME_FAILURE;
 
     const Config& config = get_config();
 
     // Pass through if disabled
     if (!config.enabled || config.bypass_mode) {
-        return ((PFN_xrEnumerateViewConfigurationViews)dispatch->xrEnumerateViewConfigurationViews)(
+        return ((PFN_xrEnumerateViewConfigurationViews)dispatch->EnumerateViewConfigurationViews)(
             instance, systemId, viewConfigurationType, viewCapacityInput, viewCountOutput, views);
     }
 
     // Call the real runtime to get actual views
-    XrResult result = ((PFN_xrEnumerateViewConfigurationViews)dispatch->xrEnumerateViewConfigurationViews)(
+    XrResult result = ((PFN_xrEnumerateViewConfigurationViews)dispatch->EnumerateViewConfigurationViews)(
         instance, systemId, viewConfigurationType, viewCapacityInput, viewCountOutput, views);
 
     if (result != XR_SUCCESS) return result;
@@ -90,23 +90,23 @@ extern "C" XrResult monoeye_xrLocateViews(
             dispatch = it->second;
         }
     }
-    if (!dispatch || !dispatch->xrLocateViews) return XR_ERROR_RUNTIME_FAILURE;
+    if (!dispatch || !dispatch->LocateViews) return XR_ERROR_RUNTIME_FAILURE;
 
     // Pass through if disabled
     if (!config.enabled || config.bypass_mode) {
-        return ((PFN_xrLocateViews)dispatch->xrLocateViews)(
+        return ((PFN_xrLocateViews)dispatch->LocateViews)(
             session, viewLocateInfo, viewState, viewCapacityInput, viewCountOutput, views);
     }
 
     // Call the real runtime with whatever capacity the app gave us
-    XrResult result = ((PFN_xrLocateViews)dispatch->xrLocateViews)(
+    XrResult result = ((PFN_xrLocateViews)dispatch->LocateViews)(
         session, viewLocateInfo, viewState, viewCapacityInput, viewCountOutput, views);
 
     // If runtime returns more than our guess, retry with correct size
     if (result == XR_ERROR_SIZE_INSUFFICIENT && viewCountOutput) {
         uint32_t needed = *viewCountOutput;
         std::vector<XrView> tmpViews(needed, {XR_TYPE_VIEW});
-        result = ((PFN_xrLocateViews)dispatch->xrLocateViews)(
+        result = ((PFN_xrLocateViews)dispatch->LocateViews)(
             session, viewLocateInfo, viewState, needed, viewCountOutput, tmpViews.data());
         if (result == XR_SUCCESS && views && viewCapacityInput >= needed) {
             for (uint32_t i = 0; i < needed; ++i) views[i] = tmpViews[i];
