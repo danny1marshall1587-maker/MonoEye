@@ -7,10 +7,10 @@
 #include "swapchain_tracker.h"
 #include "warp_pipeline.h"
 #include "config.h"
+#include "overlay_manager.h"
 #include <vulkan/vulkan.h>
 #include <openxr/openxr_platform.h>
 
-#include "overlay_manager.h"
 #include <mutex>
 #include <unordered_map>
 
@@ -127,6 +127,7 @@ extern "C" XrResult monoeye_xrDestroySession(XrSession session) {
 
     // Shut down the warp pipeline
     WarpPipeline::get_instance().shutdown();
+    OverlayManager::get_instance().shutdown();
 
     XrGeneratedDispatchTable* dispatch = nullptr;
     if (instance != XR_NULL_HANDLE) {
