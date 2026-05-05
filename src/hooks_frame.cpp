@@ -104,9 +104,11 @@ extern "C" XrResult monoeye_xrEndFrame(
     std::vector<const XrCompositionLayerBaseHeader*> modifiedLayers;
     modifiedLayers.reserve(frameEndInfo->layerCount);
 
-    // Track views we allocate per-frame
+    // Track views and layers we allocate per-frame to ensure pointers remain valid until xrEndFrame returns
     static thread_local std::vector<std::vector<XrCompositionLayerProjectionView>> s_view_storage;
+    static thread_local std::vector<XrCompositionLayerProjection> s_proj_storage;
     s_view_storage.clear();
+    s_proj_storage.clear();
 
     for (uint32_t i = 0; i < frameEndInfo->layerCount; ++i) {
         const XrCompositionLayerBaseHeader* layer = frameEndInfo->layers[i];
@@ -166,9 +168,6 @@ extern "C" XrResult monoeye_xrEndFrame(
                 }
 
                 // 3. Create a modified projection layer
-                // We use a static local to store the modified layers to avoid pointer invalidation
-                static thread_local std::vector<XrCompositionLayerProjection> s_proj_storage;
-                s_proj_storage.clear();
                 s_proj_storage.push_back(*projLayer);
                 XrCompositionLayerProjection& newLayer = s_proj_storage.back();
                 newLayer.viewCount = 2;
@@ -182,6 +181,7 @@ extern "C" XrResult monoeye_xrEndFrame(
         // Default: Keep original layer
         modifiedLayers.push_back(layer);
     }
+
 
     // 4. Add the overlay layer if visible (top-most layer)
     const XrCompositionLayerBaseHeader* overlayLayer = OverlayManager::get_instance().get_composition_layer();

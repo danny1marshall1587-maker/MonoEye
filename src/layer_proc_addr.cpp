@@ -11,6 +11,11 @@
 #include <openxr/openxr_platform.h>
 #include <cstring>
 
+namespace monoeye {
+// Global next GetInstanceProcAddr for NULL-instance calls
+PFN_xrGetInstanceProcAddr g_nextGetInstanceProcAddr = nullptr;
+}
+
 // Forward declarations of our hooked functions
 extern "C" XrResult monoeye_xrBeginFrame(
     XrSession session,
@@ -105,6 +110,7 @@ extern "C" XrResult monoeye_xrGetVulkanGraphicsRequirements2KHR(
 
 }
 
+
 extern "C" XrResult monoeye_xrGetVulkanGraphicsDevice2KHR(
     XrInstance instance,
     const XrVulkanGraphicsDeviceGetInfoKHR* getInfo,
@@ -187,6 +193,9 @@ XrResult LayerXrGetInstanceProcAddr(
     }
 
     if (!dispatch) {
+        if (monoeye::g_nextGetInstanceProcAddr) {
+            return monoeye::g_nextGetInstanceProcAddr(instance, name, function);
+        }
         MONOEYE_LOG_ERROR("No dispatch table found for instance %p", (void*)(uintptr_t)instance);
         return XR_ERROR_HANDLE_INVALID;
     }
@@ -194,5 +203,6 @@ XrResult LayerXrGetInstanceProcAddr(
     // Call down to the next layer
     return dispatch->nextGetInstanceProcAddr(instance, name, function);
 }
+
 
 } // namespace monoeye

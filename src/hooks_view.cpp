@@ -42,13 +42,14 @@ extern "C" XrResult monoeye_xrEnumerateViewConfigurationViews(
 
     MONOEYE_LOG("xrEnumerateViewConfigurationViews: Intercepting for mono mode");
 
-    // We only want to report 1 view to the application
+    // We lie to the app and say there is only 1 view, but the runtime 
+    // might require more (e.g., 2 for stereo).
     if (viewCapacityInput == 0) {
-        *viewCountOutput = 1;
+        if (viewCountOutput) *viewCountOutput = 1;
         return XR_SUCCESS;
     }
 
-    // Call the runtime to get the real view config for at least 1 view
+    // Call the runtime to get the real views using a temporary buffer
     XrGeneratedDispatchTable* dispatch = nullptr;
     {
         std::lock_guard<std::mutex> lock(g_instance_dispatch_mutex);
@@ -60,12 +61,21 @@ extern "C" XrResult monoeye_xrEnumerateViewConfigurationViews(
     if (!dispatch || !dispatch->xrEnumerateViewConfigurationViews) return XR_ERROR_RUNTIME_FAILURE;
 
     uint32_t realViewCount = 0;
-    XrResult result = ((PFN_xrEnumerateViewConfigurationViews)dispatch->xrEnumerateViewConfigurationViews)(
-        instance, systemId, viewConfigurationType, viewCapacityInput, &realViewCount, views);
+    // Get the real count first
+    ((PFN_xrEnumerateViewConfigurationViews)dispatch->xrEnumerateViewConfigurationViews)(
+        instance, systemId, viewConfigurationType, 0, &realViewCount, nullptr);
 
+    if (realViewCount == 0) return XR_ERROR_RUNTIME_FAILURE;
+
+    std::vector<XrViewConfigurationView> realViews(realViewCount, {XR_TYPE_VIEW_CONFIGURATION_VIEW});
+    XrResult result = ((PFN_xrEnumerateViewConfigurationViews)dispatch->xrEnumerateViewConfigurationViews)(
+        instance, systemId, viewConfigurationType, realViewCount, &realViewCount, realViews.data());
 
     if (result == XR_SUCCESS) {
-        *viewCountOutput = 1; // Lie to the app
+        if (views && viewCapacityInput >= 1) {
+            views[0] = realViews[0]; // Give the app the first one
+        }
+        if (viewCountOutput) *viewCountOutput = 1;
     }
 
     return result;
@@ -109,29 +119,33 @@ extern "C" XrResult monoeye_xrLocateViews(
             session, viewLocateInfo, viewState, viewCapacityInput, viewCountOutput, views);
     }
 
-
     // MONO MODE: Application only sees 1 view
     if (viewCapacityInput == 0) {
-        *viewCountOutput = 1;
+        if (viewCountOutput) *viewCountOutput = 1;
         return XR_SUCCESS;
     }
 
-    // We still need to locate both views internally for IPD calculation, 
-    // but we only return the first one to the app.
-    std::vector<XrView> realViews(2); // Assume 2 for VR
-    for (auto& v : realViews) v.type = XR_TYPE_VIEW;
+    // We must call the runtime with at least the real number of views it expects.
+    // Usually 2 for stereo.
+    uint32_t realViewCount = 2; // Default to 2
+    std::vector<XrView> realViews(realViewCount, {XR_TYPE_VIEW});
 
-    uint32_t realViewCount = 0;
     XrResult result = ((PFN_xrLocateViews)dispatch->xrLocateViews)(
-        session, viewLocateInfo, viewState, 2, &realViewCount, realViews.data());
+        session, viewLocateInfo, viewState, realViewCount, &realViewCount, realViews.data());
 
+    // If runtime returns more than our guess, retry
+    if (result == XR_ERROR_SIZE_INSUFFICIENT) {
+        realViews.resize(realViewCount, {XR_TYPE_VIEW});
+        result = ((PFN_xrLocateViews)dispatch->xrLocateViews)(
+            session, viewLocateInfo, viewState, realViewCount, &realViewCount, realViews.data());
+    }
 
     if (result == XR_SUCCESS) {
-        // Copy only the first view (Left eye) to the app
-        if (viewCapacityInput >= 1) {
+        // Copy only the first view to the app
+        if (views && viewCapacityInput >= 1) {
             views[0] = realViews[0];
-            *viewCountOutput = 1;
         }
+        if (viewCountOutput) *viewCountOutput = 1;
     }
 
     return result;

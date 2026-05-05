@@ -56,7 +56,10 @@ extern "C" MONOEYE_EXPORT XrResult xrNegotiateLoaderApiLayerInterface(
     }
 
     // Fill in our capabilities
-    apiLayerRequest->layerInterfaceVersion = XR_CURRENT_LOADER_API_LAYER_VERSION;
+    // Store the global next get instance proc addr
+    monoeye::g_nextGetInstanceProcAddr = loaderInfo->nextGetInstanceProcAddr;
+
+    apiLayerRequest->layerInterfaceVersion = XR_CURRENT_LOADER_API_LAYER_INTERFACE_VERSION;
     apiLayerRequest->layerApiVersion = XR_CURRENT_API_VERSION;
     apiLayerRequest->getInstanceProcAddr = monoeye::LayerXrGetInstanceProcAddr;
     apiLayerRequest->createApiLayerInstance = monoeye::LayerXrCreateApiLayerInstance;
