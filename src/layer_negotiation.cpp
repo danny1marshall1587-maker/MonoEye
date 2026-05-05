@@ -8,6 +8,11 @@
 
 
 
+namespace monoeye {
+// Global next GetInstanceProcAddr for NULL-instance calls
+PFN_xrGetInstanceProcAddr g_nextGetInstanceProcAddr = nullptr;
+}
+
 // The core negotiation function - this is the only function the loader calls
 // directly from our DLL via GetProcAddress. Everything else goes through
 // xrGetInstanceProcAddr.
@@ -56,13 +61,11 @@ extern "C" MONOEYE_EXPORT XrResult xrNegotiateLoaderApiLayerInterface(
     }
 
     // Fill in our capabilities
-    // Store the global next get instance proc addr
-    monoeye::g_nextGetInstanceProcAddr = loaderInfo->nextGetInstanceProcAddr;
-
-    apiLayerRequest->layerInterfaceVersion = XR_CURRENT_LOADER_API_LAYER_INTERFACE_VERSION;
+    apiLayerRequest->layerInterfaceVersion = XR_CURRENT_LOADER_API_LAYER_VERSION;
     apiLayerRequest->layerApiVersion = XR_CURRENT_API_VERSION;
     apiLayerRequest->getInstanceProcAddr = monoeye::LayerXrGetInstanceProcAddr;
     apiLayerRequest->createApiLayerInstance = monoeye::LayerXrCreateApiLayerInstance;
+
 
     MONOEYE_LOG("Negotiation successful - interface version: %u, API version: %u",
                 apiLayerRequest->layerInterfaceVersion,

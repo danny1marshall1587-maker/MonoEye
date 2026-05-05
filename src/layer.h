@@ -41,7 +41,11 @@ extern "C" MONOEYE_EXPORT XrResult xrNegotiateLoaderApiLayerInterface(
 
 namespace monoeye {
 
+// Global next GetInstanceProcAddr for NULL-instance calls
+extern PFN_xrGetInstanceProcAddr g_nextGetInstanceProcAddr;
+
 struct InstanceState;
+
 
 // Internal layer functions (not exported directly)
 XrResult LayerXrCreateApiLayerInstance(

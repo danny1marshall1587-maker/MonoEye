@@ -11,10 +11,7 @@
 #include <openxr/openxr_platform.h>
 #include <cstring>
 
-namespace monoeye {
-// Global next GetInstanceProcAddr for NULL-instance calls
-PFN_xrGetInstanceProcAddr g_nextGetInstanceProcAddr = nullptr;
-}
+
 
 // Forward declarations of our hooked functions
 extern "C" XrResult monoeye_xrBeginFrame(

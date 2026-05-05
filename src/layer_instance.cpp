@@ -69,6 +69,8 @@ XrResult LayerXrCreateApiLayerInstance(
     PFN_xrGetInstanceProcAddr nextGetInstanceProcAddr =
         apiLayerInfo->nextInfo->nextGetInstanceProcAddr;
 
+    monoeye::g_nextGetInstanceProcAddr = nextGetInstanceProcAddr;
+
     if (!nextGetInstanceProcAddr) {
         MONOEYE_LOG_ERROR("nextGetInstanceProcAddr is null");
         return XR_ERROR_INITIALIZATION_FAILED;
