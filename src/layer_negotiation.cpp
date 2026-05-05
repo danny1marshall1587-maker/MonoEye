@@ -6,7 +6,7 @@
 
 #include <cstring>
 
-} // namespace monoeye
+
 
 // The core negotiation function - this is the only function the loader calls
 // directly from our DLL via GetProcAddress. Everything else goes through
