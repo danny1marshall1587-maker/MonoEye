@@ -43,15 +43,27 @@ void monoeye_log(LogLevel level, const char* file, int line, const char* fmt, ..
     // Initialize file logging on first use
     if (!s_log_initialized) {
         get_log_level(); // Forces initialization of log level
-        const char* temp_path = nullptr;
+        char log_path[512];
+        log_path[0] = '\0';
+
 #ifdef _WIN32
-        temp_path = getenv("TEMP");
+        const char* user_profile = getenv("USERPROFILE");
+        if (user_profile) {
+            snprintf(log_path, sizeof(log_path), "%s\\Documents\\MonoEye", user_profile);
+            CreateDirectoryA(log_path, NULL);
+            strncat(log_path, "\\monoeye.log", sizeof(log_path) - strlen(log_path) - 1);
+        }
 #else
-        temp_path = "/tmp";
+        const char* home = getenv("HOME");
+        if (home) {
+            snprintf(log_path, sizeof(log_path), "%s/Documents/MonoEye", home);
+            char mkdir_cmd[512];
+            snprintf(mkdir_cmd, sizeof(mkdir_cmd), "mkdir -p %s", log_path);
+            system(mkdir_cmd);
+            strncat(log_path, "/monoeye.log", sizeof(log_path) - strlen(log_path) - 1);
+        }
 #endif
-        if (temp_path) {
-            char log_path[512];
-            snprintf(log_path, sizeof(log_path), "%s/monoeye.log", temp_path);
+        if (log_path[0] != '\0') {
             s_log_file = fopen(log_path, "a"); // Append mode
             if (s_log_file) {
                 fprintf(s_log_file, "\n--- MonoEye Log Session Started ---\n");
@@ -59,6 +71,7 @@ void monoeye_log(LogLevel level, const char* file, int line, const char* fmt, ..
         }
         s_log_initialized = true;
     }
+
 
     // Get timestamp
     auto now = std::chrono::system_clock::now();
