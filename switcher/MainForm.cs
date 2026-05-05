@@ -431,7 +431,7 @@ namespace MonoEyeSwitcher
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 // Fallback to CurrentUser if LocalMachine fails
                 if (enable)
