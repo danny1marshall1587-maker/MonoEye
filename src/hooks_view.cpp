@@ -22,34 +22,6 @@ extern "C" XrResult monoeye_xrEnumerateViewConfigurationViews(
     uint32_t* viewCountOutput,
     XrViewConfigurationView* views
 ) {
-    const Config& config = get_config();
-    
-    // Pass through if disabled
-    if (!config.enabled || config.bypass_mode) {
-        XrGeneratedDispatchTable* dispatch = nullptr;
-        {
-            std::lock_guard<std::mutex> lock(g_instance_dispatch_mutex);
-            auto it = g_instance_dispatch_map.find(instance);
-            if (it != g_instance_dispatch_map.end()) {
-                dispatch = it->second;
-            }
-        }
-        if (!dispatch || !dispatch->xrEnumerateViewConfigurationViews) return XR_ERROR_RUNTIME_FAILURE;
-        return ((PFN_xrEnumerateViewConfigurationViews)dispatch->xrEnumerateViewConfigurationViews)(
-            instance, systemId, viewConfigurationType, viewCapacityInput, viewCountOutput, views);
-
-    }
-
-    MONOEYE_LOG("xrEnumerateViewConfigurationViews: Intercepting for mono mode");
-
-    // We lie to the app and say there is only 1 view, but the runtime 
-    // might require more (e.g., 2 for stereo).
-    if (viewCapacityInput == 0) {
-        if (viewCountOutput) *viewCountOutput = 1;
-        return XR_SUCCESS;
-    }
-
-    // Call the runtime to get the real views using a temporary buffer
     XrGeneratedDispatchTable* dispatch = nullptr;
     {
         std::lock_guard<std::mutex> lock(g_instance_dispatch_mutex);
@@ -60,25 +32,32 @@ extern "C" XrResult monoeye_xrEnumerateViewConfigurationViews(
     }
     if (!dispatch || !dispatch->xrEnumerateViewConfigurationViews) return XR_ERROR_RUNTIME_FAILURE;
 
-    uint32_t realViewCount = 0;
-    // Get the real count first
-    ((PFN_xrEnumerateViewConfigurationViews)dispatch->xrEnumerateViewConfigurationViews)(
-        instance, systemId, viewConfigurationType, 0, &realViewCount, nullptr);
+    const Config& config = get_config();
 
-    if (realViewCount == 0) return XR_ERROR_RUNTIME_FAILURE;
-
-    std::vector<XrViewConfigurationView> realViews(realViewCount, {XR_TYPE_VIEW_CONFIGURATION_VIEW});
-    XrResult result = ((PFN_xrEnumerateViewConfigurationViews)dispatch->xrEnumerateViewConfigurationViews)(
-        instance, systemId, viewConfigurationType, realViewCount, &realViewCount, realViews.data());
-
-    if (result == XR_SUCCESS) {
-        if (views && viewCapacityInput >= 1) {
-            views[0] = realViews[0]; // Give the app the first one
-        }
-        if (viewCountOutput) *viewCountOutput = 1;
+    // Pass through if disabled
+    if (!config.enabled || config.bypass_mode) {
+        return ((PFN_xrEnumerateViewConfigurationViews)dispatch->xrEnumerateViewConfigurationViews)(
+            instance, systemId, viewConfigurationType, viewCapacityInput, viewCountOutput, views);
     }
 
-    return result;
+    // Call the real runtime to get actual views
+    XrResult result = ((PFN_xrEnumerateViewConfigurationViews)dispatch->xrEnumerateViewConfigurationViews)(
+        instance, systemId, viewConfigurationType, viewCapacityInput, viewCountOutput, views);
+
+    if (result != XR_SUCCESS) return result;
+
+    // In mono mode: we keep the REAL view count (typically 2) so strict engines
+    // don't assert, but we make both views identical (using left eye props).
+    // The actual mono collapse happens in xrEndFrame.
+    if (views && viewCountOutput && *viewCountOutput >= 2) {
+        MONOEYE_LOG("xrEnumerateViewConfigurationViews: Returning %d views (stereo-compatible mono mode)", *viewCountOutput);
+        // Mirror left eye properties into all other views so rendering is symmetric
+        for (uint32_t i = 1; i < *viewCountOutput; ++i) {
+            views[i] = views[0];
+        }
+    }
+
+    return XR_SUCCESS;
 }
 
 extern "C" XrResult monoeye_xrLocateViews(
@@ -119,33 +98,28 @@ extern "C" XrResult monoeye_xrLocateViews(
             session, viewLocateInfo, viewState, viewCapacityInput, viewCountOutput, views);
     }
 
-    // MONO MODE: Application only sees 1 view
-    if (viewCapacityInput == 0) {
-        if (viewCountOutput) *viewCountOutput = 1;
-        return XR_SUCCESS;
-    }
-
-    // We must call the runtime with at least the real number of views it expects.
-    // Usually 2 for stereo.
-    uint32_t realViewCount = 2; // Default to 2
-    std::vector<XrView> realViews(realViewCount, {XR_TYPE_VIEW});
-
+    // Call the real runtime with whatever capacity the app gave us
     XrResult result = ((PFN_xrLocateViews)dispatch->xrLocateViews)(
-        session, viewLocateInfo, viewState, realViewCount, &realViewCount, realViews.data());
+        session, viewLocateInfo, viewState, viewCapacityInput, viewCountOutput, views);
 
-    // If runtime returns more than our guess, retry
-    if (result == XR_ERROR_SIZE_INSUFFICIENT) {
-        realViews.resize(realViewCount, {XR_TYPE_VIEW});
+    // If runtime returns more than our guess, retry with correct size
+    if (result == XR_ERROR_SIZE_INSUFFICIENT && viewCountOutput) {
+        uint32_t needed = *viewCountOutput;
+        std::vector<XrView> tmpViews(needed, {XR_TYPE_VIEW});
         result = ((PFN_xrLocateViews)dispatch->xrLocateViews)(
-            session, viewLocateInfo, viewState, realViewCount, &realViewCount, realViews.data());
+            session, viewLocateInfo, viewState, needed, viewCountOutput, tmpViews.data());
+        if (result == XR_SUCCESS && views && viewCapacityInput >= needed) {
+            for (uint32_t i = 0; i < needed; ++i) views[i] = tmpViews[i];
+        }
     }
 
-    if (result == XR_SUCCESS) {
-        // Copy only the first view to the app
-        if (views && viewCapacityInput >= 1) {
-            views[0] = realViews[0];
+    // Mono mode: mirror left eye pose/fov into all other views so the app
+    // gets consistent stereo data but we only render once.
+    if (result == XR_SUCCESS && views && viewCountOutput && *viewCountOutput >= 2) {
+        for (uint32_t i = 1; i < *viewCountOutput; ++i) {
+            views[i].pose = views[0].pose;
+            views[i].fov  = views[0].fov;
         }
-        if (viewCountOutput) *viewCountOutput = 1;
     }
 
     return result;

@@ -117,9 +117,15 @@ extern "C" XrResult monoeye_xrEndFrame(
             const XrCompositionLayerProjection* projLayer = 
                 reinterpret_cast<const XrCompositionLayerProjection*>(layer);
             
-            if (projLayer->viewCount == 1) {
-                // MONO BYPASS DETECTED - Expand to Stereo
-                MONOEYE_LOG_DEBUG("Mono projection detected, expanding to stereo");
+            // MONO DETECTION: app submitted 2 views but both reference the same swapchain
+            // (stereo-compatible mono mode — we told the app views are identical).
+            bool isMono = (projLayer->viewCount == 1) ||
+                          (projLayer->viewCount >= 2 &&
+                           projLayer->views[0].subImage.swapchain == projLayer->views[1].subImage.swapchain);
+
+            if (isMono) {
+                // MONO BYPASS DETECTED - Expand to proper Stereo with warp
+                MONOEYE_LOG_DEBUG("Mono projection detected (viewCount=%d), expanding to stereo", projLayer->viewCount);
 
                 s_view_storage.emplace_back(2);
                 auto& newViews = s_view_storage.back();
