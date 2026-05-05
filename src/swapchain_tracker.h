@@ -27,15 +27,17 @@ struct SwapchainImageInfo {
     XrSwapchainCreateInfo createInfo;
     uint32_t imageCount;
 
-    // For Vulkan, we need the actual image handles
+    // For Vulkan, we need the actual image handles and views
     bool isVulkan;
     std::vector<VkImage> vulkanImages;
+    std::vector<VkImageView> vulkanImageViews;
 
     // Tracking which eye this swapchain belongs to
     bool isDepth;
     bool isLeftEye;
     bool isRightEye;
 };
+
 
 class SwapchainTracker {
 public:

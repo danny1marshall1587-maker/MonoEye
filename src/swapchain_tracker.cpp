@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "swapchain_tracker.h"
+#include "warp_pipeline.h"
 #include "logging.h"
 #include <cstring>
+
 
 namespace monoeye {
 
@@ -31,26 +33,31 @@ void SwapchainTracker::track_swapchain(
     // Extract Vulkan image handles if this is a Vulkan swapchain
     info.isVulkan = false;
     if (createInfo.usageFlags & XR_SWAPCHAIN_USAGE_SAMPLED_BIT) {
-#ifdef _WIN32
-        // Try to interpret as Vulkan images
         const XrSwapchainImageVulkanKHR* vkImages =
             reinterpret_cast<const XrSwapchainImageVulkanKHR*>(images);
         if (images && images->type == XR_TYPE_SWAPCHAIN_IMAGE_VULKAN_KHR) {
             info.isVulkan = true;
+            VkDevice device = WarpPipeline::get_instance().get_vk_device();
             for (uint32_t i = 0; i < imageCount; ++i) {
                 info.vulkanImages.push_back(vkImages[i].image);
+                
+                if (device != VK_NULL_HANDLE) {
+                    VkImageViewCreateInfo viewInfo = {VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+                    viewInfo.image = vkImages[i].image;
+                    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+                    viewInfo.format = static_cast<VkFormat>(createInfo.format);
+                    viewInfo.subresourceRange.aspectMask = (createInfo.usageFlags & XR_SWAPCHAIN_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+                    viewInfo.subresourceRange.levelCount = 1;
+                    viewInfo.subresourceRange.layerCount = 1;
+                    
+                    VkImageView view;
+                    if (vkCreateImageView(device, &viewInfo, nullptr, &view) == VK_SUCCESS) {
+                        info.vulkanImageViews.push_back(view);
+                    }
+                }
             }
         }
-#else
-        const XrSwapchainImageVulkanKHR* vkImages =
-            reinterpret_cast<const XrSwapchainImageVulkanKHR*>(images);
-        if (images && images->type == XR_TYPE_SWAPCHAIN_IMAGE_VULKAN_KHR) {
-            info.isVulkan = true;
-            for (uint32_t i = 0; i < imageCount; ++i) {
-                info.vulkanImages.push_back(vkImages[i].image);
-            }
-        }
-#endif
+
     }
 
     // Check if this is a depth swapchain based on usage flags
@@ -72,10 +79,20 @@ void SwapchainTracker::track_swapchain(
 
 void SwapchainTracker::untrack_swapchain(XrSwapchain swapchain) {
     std::lock_guard<std::mutex> lock(m_mutex);
-    m_swapchains.erase(swapchain);
+    auto it = m_swapchains.find(swapchain);
+    if (it != m_swapchains.end()) {
+        VkDevice device = WarpPipeline::get_instance().get_vk_device();
+        if (device != VK_NULL_HANDLE) {
+            for (auto view : it->second.vulkanImageViews) {
+                vkDestroyImageView(device, view, nullptr);
+            }
+        }
+        m_swapchains.erase(it);
+    }
     m_assigned_eye.erase(swapchain);
     MONOEYE_LOG_DEBUG("Untracked swapchain %p", (void*)(uintptr_t)swapchain);
 }
+
 
 SwapchainImageInfo* SwapchainTracker::get_info(XrSwapchain swapchain) {
     std::lock_guard<std::mutex> lock(m_mutex);
@@ -219,9 +236,26 @@ XrSwapchain SwapchainTracker::get_or_create_right_swapchain(
         info.isLeftEye = false;
         info.isRightEye = true; // Mark as right eye
         info.isVulkan = true;
+        VkDevice device = WarpPipeline::get_instance().get_vk_device();
         for (uint32_t i = 0; i < actualCount; ++i) {
             info.vulkanImages.push_back(vkImages[i].image);
+            
+            if (device != VK_NULL_HANDLE) {
+                VkImageViewCreateInfo viewInfo = {VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+                viewInfo.image = vkImages[i].image;
+                viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+                viewInfo.format = static_cast<VkFormat>(createInfo.format);
+                viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                viewInfo.subresourceRange.levelCount = 1;
+                viewInfo.subresourceRange.layerCount = 1;
+                
+                VkImageView view;
+                if (vkCreateImageView(device, &viewInfo, nullptr, &view) == VK_SUCCESS) {
+                    info.vulkanImageViews.push_back(view);
+                }
+            }
         }
+
 
         m_swapchains[rightSwapchain] = info;
     }

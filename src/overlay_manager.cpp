@@ -16,6 +16,7 @@ void OverlayManager::initialize(XrInstance instance, XrSession session, VkDevice
 
     m_xrInstance = instance;
     m_xrSession = session;
+    m_vkInstance = WarpPipeline::get_instance().get_vk_instance();
     m_vkDevice = device;
 
     MONOEYE_LOG("Initializing OverlayManager...");
@@ -139,14 +140,21 @@ void OverlayManager::begin_frame() {
     // ImGui NewFrame logic will go here
 }
 
+#ifdef _WIN32
 #include <windows.h>
+#endif
+
 
 void OverlayManager::end_frame(XrTime displayTime) {
     if (!m_initialized) return;
 
     // 1. Handle Keyboard Input
     static bool homeWasDown = false;
-    bool homeIsDown = (GetAsyncKeyState(VK_HOME) & 0x8000) != 0;
+    bool homeIsDown = false;
+#ifdef _WIN32
+    homeIsDown = (GetAsyncKeyState(VK_HOME) & 0x8000) != 0;
+#endif
+
     
     if (homeIsDown && !homeWasDown) {
         m_visible = !m_visible;
@@ -162,12 +170,23 @@ void OverlayManager::end_frame(XrTime displayTime) {
         float currentTime = (float)displayTime / 1e9f;
         
         if (currentTime - lastKeyTime > 0.15f) { // Cooldown for keys
-            if (GetAsyncKeyState(VK_UP) & 0x8000) { m_menuIndex = (m_menuIndex - 1 + 4) % 4; lastKeyTime = currentTime; }
-            if (GetAsyncKeyState(VK_DOWN) & 0x8000) { m_menuIndex = (m_menuIndex + 1) % 4; lastKeyTime = currentTime; }
+            bool upPressed = false;
+            bool downPressed = false;
+            bool leftPressed = false;
+            bool rightPressed = false;
+#ifdef _WIN32
+            upPressed = (GetAsyncKeyState(VK_UP) & 0x8000) != 0;
+            downPressed = (GetAsyncKeyState(VK_DOWN) & 0x8000) != 0;
+            leftPressed = (GetAsyncKeyState(VK_LEFT) & 0x8000) != 0;
+            rightPressed = (GetAsyncKeyState(VK_RIGHT) & 0x8000) != 0;
+#endif
+
+            if (upPressed) { m_menuIndex = (m_menuIndex - 1 + 4) % 4; lastKeyTime = currentTime; }
+            if (downPressed) { m_menuIndex = (m_menuIndex + 1) % 4; lastKeyTime = currentTime; }
             
             // Left/Right to adjust values (Placeholder logic)
-            if (GetAsyncKeyState(VK_LEFT) & 0x8000) { /* Decrease current setting */ lastKeyTime = currentTime; }
-            if (GetAsyncKeyState(VK_RIGHT) & 0x8000) { /* Increase current setting */ lastKeyTime = currentTime; }
+            if (leftPressed) { /* Decrease current setting */ lastKeyTime = currentTime; }
+            if (rightPressed) { /* Increase current setting */ lastKeyTime = currentTime; }
         }
     }
 

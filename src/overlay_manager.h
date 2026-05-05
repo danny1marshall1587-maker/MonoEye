@@ -39,6 +39,7 @@ private:
 
     XrInstance m_xrInstance = XR_NULL_HANDLE;
     XrSession m_xrSession = XR_NULL_HANDLE;
+    VkInstance m_vkInstance = VK_NULL_HANDLE;
     VkDevice m_vkDevice = VK_NULL_HANDLE;
     
     XrSwapchain m_swapchain = XR_NULL_HANDLE;

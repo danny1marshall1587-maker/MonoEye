@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.18)
 project(MonoEye
-    VERSION 0.3.0
+    VERSION 0.5.0
+
     DESCRIPTION "MonoEye - Single-eye VR rendering with depth-based second eye reconstruction"
     LANGUAGES CXX
 )
@@ -28,6 +29,8 @@ option(MONOEYE_STRICT_WARNINGS "Treat warnings as errors" OFF)
 # Find required packages
 find_package(Vulkan REQUIRED)
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
+find_package(Threads REQUIRED)
+
 
 # OpenXR headers - use submodule if available, otherwise find system
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/OpenXR-SDK/include")
@@ -189,7 +192,9 @@ target_include_directories(monoeye PRIVATE
 target_link_libraries(monoeye PRIVATE
     openxr_headers
     Vulkan::Vulkan
+    Threads::Threads
 )
+
 
 target_compile_definitions(monoeye PRIVATE
     MONOEYE_EXPORTS

@@ -1,5 +1,7 @@
 #include "openvr_proxy.h"
+#ifdef _WIN32
 #include <windows.h>
+#endif
 #include <iostream>
 #include "../logging.h"
 
