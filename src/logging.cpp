@@ -24,25 +24,33 @@ static LogLevel s_log_level = LOG_INFO;
 static bool s_log_initialized = false;
 static FILE* s_log_file = nullptr;
 
-void monoeye_log(LogLevel level, const char* file, int line, const char* fmt, ...) {
-    if (!log_enabled(level)) {
-        return;
+static void ensure_initialized() {
+    if (s_log_initialized) return;
+
+    // Default level
+    s_log_level = LOG_INFO;
+
+    const char* level_str = getenv("MONOEYE_LOG_LEVEL");
+    if (level_str) {
+        switch (level_str[0]) {
+            case 'd': case 'D': s_log_level = LOG_DEBUG; break;
+            case 'i': case 'I': s_log_level = LOG_INFO;  break;
+            case 'w': case 'W': s_log_level = LOG_WARN;  break;
+            case 'e': case 'E': s_log_level = LOG_ERROR; break;
+            default: s_log_level = LOG_DEBUG; break;
+        }
+    } else {
+        // If not specified, but enabled, default to DEBUG
+        const char* enabled_str = getenv("MONOEYE_LOG_ENABLED");
+        if (enabled_str && (enabled_str[0] == '1' || enabled_str[0] == 't' || enabled_str[0] == 'T')) {
+            s_log_level = LOG_DEBUG;
+        }
     }
 
-    const char* level_str;
-    switch (level) {
-        case LOG_DEBUG: level_str = "DEBUG"; break;
-        case LOG_INFO:  level_str = "INFO "; break;
-        case LOG_WARN:  level_str = "WARN "; break;
-        case LOG_ERROR: level_str = "ERROR"; break;
-        default: level_str = "?????"; break;
-    }
+    const char* enabled_str = getenv("MONOEYE_LOG_ENABLED");
+    bool logging_enabled = enabled_str && (enabled_str[0] == '1' || enabled_str[0] == 't' || enabled_str[0] == 'T');
 
-    std::lock_guard<std::mutex> lock(s_log_mutex);
-
-    // Initialize file logging on first use
-    if (!s_log_initialized) {
-        get_log_level(); // Forces initialization of log level
+    if (logging_enabled) {
         char log_path[512];
         log_path[0] = '\0';
 
@@ -64,17 +72,34 @@ void monoeye_log(LogLevel level, const char* file, int line, const char* fmt, ..
         }
 #endif
         if (log_path[0] != '\0') {
-            s_log_file = fopen(log_path, "w"); // Overwrite mode for "Full Debug" to avoid massive files
+            s_log_file = fopen(log_path, "w"); // Overwrite mode
             if (s_log_file) {
-                fprintf(s_log_file, "=== MonoEye Full Debug Log ===\n");
+                fprintf(s_log_file, "=== MonoEye Debug Log ===\n");
                 fprintf(s_log_file, "Build Date: %s %s\n", __DATE__, __TIME__);
-                fprintf(s_log_file, "==============================\n\n");
+                fprintf(s_log_file, "=========================\n\n");
             }
         }
-        s_log_initialized = true;
     }
 
+    s_log_initialized = true;
+}
 
+void monoeye_log(LogLevel level, const char* file, int line, const char* fmt, ...) {
+    std::lock_guard<std::mutex> lock(s_log_mutex);
+    ensure_initialized();
+
+    if (level < s_log_level) {
+        return;
+    }
+
+    const char* level_str;
+    switch (level) {
+        case LOG_DEBUG: level_str = "DEBUG"; break;
+        case LOG_INFO:  level_str = "INFO "; break;
+        case LOG_WARN:  level_str = "WARN "; break;
+        case LOG_ERROR: level_str = "ERROR"; break;
+        default: level_str = "?????"; break;
+    }
 
     // Get timestamp
     auto now = std::chrono::system_clock::now();
@@ -82,7 +107,14 @@ void monoeye_log(LogLevel level, const char* file, int line, const char* fmt, ..
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
 
     char time_str[64];
-    strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", std::localtime(&in_time_t));
+    // use localtime_r/s if available, but for simplicity:
+    struct tm time_info;
+#ifdef _WIN32
+    localtime_s(&time_info, &in_time_t);
+#else
+    localtime_r(&in_time_t, &time_info);
+#endif
+    strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", &time_info);
 
     // Extract just the filename
     const char* filename = file;
@@ -132,23 +164,11 @@ void monoeye_log(LogLevel level, const char* file, int line, const char* fmt, ..
 
 
 LogLevel get_log_level() {
-    if (!s_log_initialized) {
-        const char* level_str = getenv("MONOEYE_LOG_LEVEL");
-        if (level_str) {
-            switch (level_str[0]) {
-                case 'd': case 'D': s_log_level = LOG_DEBUG; break;
-                case 'i': case 'I': s_log_level = LOG_INFO;  break;
-                case 'w': case 'W': s_log_level = LOG_WARN;  break;
-                case 'e': case 'E': s_log_level = LOG_ERROR; break;
-                default: s_log_level = LOG_DEBUG; break;
-            }
-        } else {
-            s_log_level = LOG_DEBUG; // Default to full debug for now
-        }
-
-        s_log_initialized = true;
-    }
+    ensure_initialized();
     return s_log_level;
 }
+
+} // namespace monoeye
+
 
 } // namespace monoeye

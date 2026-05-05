@@ -23,6 +23,10 @@ namespace MonoEyeSwitcher
         private Label titleLabel;
         private Label infoLabel;
         private GroupBox openVrInstallerGroupBox;
+        private GroupBox diagnosticsGroupBox;
+        private CheckBox loggingCheckbox;
+        private TextBox sessionNameTextBox;
+        private Button saveLogButton;
 
         private Button selectGameFolderButton;
         private Label gameFolderLabel;
@@ -314,7 +318,74 @@ namespace MonoEyeSwitcher
             };
             openVrInstallerGroupBox.Controls.Add(gameFolderLabel);
 
-            this.Size = new Size(415, 820);
+            // --- Diagnostics & Logging Section ---
+            diagnosticsGroupBox = new GroupBox
+            {
+                Text = "Diagnostics & Logging",
+                ForeColor = Color.FromArgb(0, 255, 150),
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                Size = new Size(360, 130),
+                Location = new Point(20, 800)
+            };
+            this.Controls.Add(diagnosticsGroupBox);
+
+            loggingCheckbox = new CheckBox
+            {
+                Text = "Enable Debug Logging (Requires Restart)",
+                ForeColor = Color.White,
+                Font = new Font("Segoe UI", 8.5F),
+                Location = new Point(15, 25),
+                AutoSize = true,
+                Checked = false
+            };
+            diagnosticsGroupBox.Controls.Add(loggingCheckbox);
+
+            Label sessionLabel = new Label
+            {
+                Text = "Session / Game Name:",
+                ForeColor = Color.FromArgb(200, 200, 200),
+                Font = new Font("Segoe UI", 8F),
+                Location = new Point(15, 55),
+                AutoSize = true
+            };
+            diagnosticsGroupBox.Controls.Add(sessionLabel);
+
+            sessionNameTextBox = new TextBox
+            {
+                Size = new Size(200, 23),
+                Location = new Point(15, 75),
+                BackColor = Color.FromArgb(40, 40, 40),
+                ForeColor = Color.White,
+                BorderStyle = BorderStyle.FixedSingle,
+                Text = "test_session"
+            };
+            diagnosticsGroupBox.Controls.Add(sessionNameTextBox);
+
+            saveLogButton = new Button
+            {
+                Text = "Save Log",
+                Size = new Size(115, 25),
+                Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+                BackColor = Color.FromArgb(60, 60, 60),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(225, 74)
+            };
+            saveLogButton.Click += SaveLogButton_Click;
+            diagnosticsGroupBox.Controls.Add(saveLogButton);
+
+            Label logInfoLabel = new Label
+            {
+                Text = "Logs are saved to Documents\\MonoEye",
+                Font = new Font("Segoe UI", 7F),
+                ForeColor = Color.Gray,
+                Location = new Point(15, 105),
+                Size = new Size(330, 20),
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+            diagnosticsGroupBox.Controls.Add(logInfoLabel);
+
+            this.Size = new Size(415, 960);
         }
 
         private void UpdateStatus()
@@ -341,6 +412,10 @@ namespace MonoEyeSwitcher
 
                 // Also check Registry
                 CheckRegistryStatus();
+
+                // Check logging status
+                string logValue = Environment.GetEnvironmentVariable("MONOEYE_LOG_ENABLED", EnvironmentVariableTarget.Machine);
+                loggingCheckbox.Checked = logValue == "1";
             }
             catch
             {
@@ -465,6 +540,11 @@ namespace MonoEyeSwitcher
                 Environment.SetEnvironmentVariable("MONOEYE_TENSOR_STABILIZATION", tensorCheckbox.Checked ? "1" : "0", EnvironmentVariableTarget.Machine);
                 Environment.SetEnvironmentVariable("MONOEYE_SPECULAR_REJECTION", specularCheckbox.Checked ? "1" : "0", EnvironmentVariableTarget.Machine);
                 Environment.SetEnvironmentVariable("MONOEYE_EDGE_SMOOTHING", edgeCheckbox.Checked ? "1" : "0", EnvironmentVariableTarget.Machine);
+                Environment.SetEnvironmentVariable("MONOEYE_LOG_ENABLED", loggingCheckbox.Checked ? "1" : "0", EnvironmentVariableTarget.Machine);
+                if (loggingCheckbox.Checked)
+                {
+                    Environment.SetEnvironmentVariable("MONOEYE_LOG_LEVEL", "debug", EnvironmentVariableTarget.Machine);
+                }
 
                 MessageBox.Show(
                     $"Settings applied!\n\nv3 Clarity Stack: {(tensorCheckbox.Checked ? "Active (Tensor)" : "Standard")}\nSpecular Cleaning: {(specularCheckbox.Checked ? "On" : "Off")}\nEdge Smoothing: {(edgeCheckbox.Checked ? "On" : "Off")}\n\nRestart VR apps to apply changes.",
@@ -540,6 +620,40 @@ namespace MonoEyeSwitcher
                         MessageBox.Show("Could not find 'openvr_api.dll' in the selected folder. Are you sure this is the right directory?", "Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     }
                 }
+            }
+        private void SaveLogButton_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                string documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                string monoeyePath = System.IO.Path.Combine(documentsPath, "MonoEye");
+                string sourceLog = System.IO.Path.Combine(monoeyePath, "monoeye.log");
+
+                if (!System.IO.File.Exists(sourceLog))
+                {
+                    MessageBox.Show("No log file found. Please run a game with logging enabled first.", "MonoEye Switcher", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                string sessionName = sessionNameTextBox.Text.Trim();
+                if (string.IsNullOrEmpty(sessionName)) sessionName = "unnamed_session";
+
+                // Remove invalid filename characters
+                foreach (char c in System.IO.Path.GetInvalidFileNameChars())
+                {
+                    sessionName = sessionName.Replace(c, '_');
+                }
+
+                string targetLog = System.IO.Path.Combine(monoeyePath, $"{sessionName}.log");
+
+                // Copy the file (allow overwriting)
+                System.IO.File.Copy(sourceLog, targetLog, true);
+
+                MessageBox.Show($"Log saved successfully to:\n{targetLog}", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to save log: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
     }
