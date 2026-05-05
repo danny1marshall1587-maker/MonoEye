@@ -13,11 +13,16 @@
 #include <cstdlib>
 #include <mutex>
 
+#include <chrono>
+#include <iomanip>
+#include <fstream>
+
 namespace monoeye {
 
 static std::mutex s_log_mutex;
 static LogLevel s_log_level = LOG_INFO;
 static bool s_log_initialized = false;
+static FILE* s_log_file = nullptr;
 
 void monoeye_log(LogLevel level, const char* file, int line, const char* fmt, ...) {
     if (!log_enabled(level)) {
@@ -35,6 +40,34 @@ void monoeye_log(LogLevel level, const char* file, int line, const char* fmt, ..
 
     std::lock_guard<std::mutex> lock(s_log_mutex);
 
+    // Initialize file logging on first use
+    if (!s_log_initialized) {
+        get_log_level(); // Forces initialization of log level
+        const char* temp_path = nullptr;
+#ifdef _WIN32
+        temp_path = getenv("TEMP");
+#else
+        temp_path = "/tmp";
+#endif
+        if (temp_path) {
+            char log_path[512];
+            snprintf(log_path, sizeof(log_path), "%s/monoeye.log", temp_path);
+            s_log_file = fopen(log_path, "a"); // Append mode
+            if (s_log_file) {
+                fprintf(s_log_file, "\n--- MonoEye Log Session Started ---\n");
+            }
+        }
+        s_log_initialized = true;
+    }
+
+    // Get timestamp
+    auto now = std::chrono::system_clock::now();
+    auto in_time_t = std::chrono::system_clock::to_time_t(now);
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()) % 1000;
+
+    char time_str[64];
+    strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", std::localtime(&in_time_t));
+
     // Extract just the filename
     const char* filename = file;
     for (const char* p = file; *p; ++p) {
@@ -43,28 +76,44 @@ void monoeye_log(LogLevel level, const char* file, int line, const char* fmt, ..
         }
     }
 
-    fprintf(stdout, "[MonoEye][%s] %s:%d: ", level_str, filename, line);
+    // Format the prefix
+    char prefix[256];
+    snprintf(prefix, sizeof(prefix), "[%s.%03d][MonoEye][%s] %s:%d: ", 
+             time_str, (int)ms.count(), level_str, filename, line);
 
+    // Output to stdout
+    fprintf(stdout, "%s", prefix);
     va_list args;
     va_start(args, fmt);
     vfprintf(stdout, fmt, args);
     va_end(args);
-
     fprintf(stdout, "\n");
     fflush(stdout);
+
+    // Output to file
+    if (s_log_file) {
+        fprintf(s_log_file, "%s", prefix);
+        va_list args_file;
+        va_start(args_file, fmt);
+        vfprintf(s_log_file, fmt, args_file);
+        va_end(args_file);
+        fprintf(s_log_file, "\n");
+        fflush(s_log_file);
+    }
 
 #ifdef _WIN32
     // Also output to DebugView on Windows
     char buf[4096];
-    va_list args2;
-    va_start(args2, fmt);
-    snprintf(buf, sizeof(buf), "[MonoEye][%s] %s:%d: ", level_str, filename, line);
-    vsnprintf(buf + strlen(buf), sizeof(buf) - strlen(buf), fmt, args2);
-    va_end(args2);
+    va_list args_win;
+    va_start(args_win, fmt);
+    snprintf(buf, sizeof(buf), "%s", prefix);
+    vsnprintf(buf + strlen(buf), sizeof(buf) - strlen(buf), fmt, args_win);
+    va_end(args_win);
     strncat(buf, "\n", sizeof(buf) - strlen(buf) - 1);
     OutputDebugStringA(buf);
 #endif
 }
+
 
 LogLevel get_log_level() {
     if (!s_log_initialized) {
