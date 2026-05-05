@@ -89,7 +89,7 @@ XrResult LayerXrCreateApiLayerInstance(
 
     // Zero-initialise then resolve only what we need
     *nextDispatch = {};
-    nextDispatch->xrGetInstanceProcAddr = (PFN_xrVoidFunction)nextGetInstanceProcAddr;
+    nextDispatch->nextGetInstanceProcAddr = nextGetInstanceProcAddr;
 
     // Core functions MonoEye hooks call through to downstream
     nextGetInstanceProcAddr(*instance, "xrDestroyInstance",
