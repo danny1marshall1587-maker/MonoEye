@@ -60,6 +60,8 @@ private:
     bool m_visible = false;
     
     XrCompositionLayerQuad m_quadLayer;
+    struct XrGeneratedDispatchTable* m_dispatch = nullptr;
 };
+
 
 } // namespace monoeye

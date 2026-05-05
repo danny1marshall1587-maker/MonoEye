@@ -19,6 +19,21 @@ void OverlayManager::initialize(XrInstance instance, XrSession session, VkDevice
     m_vkInstance = WarpPipeline::get_instance().get_vk_instance();
     m_vkDevice = device;
 
+    // Retrieve dispatch table
+    {
+        std::lock_guard<std::mutex> lock(g_instance_dispatch_mutex);
+        auto it = g_instance_dispatch_map.find(instance);
+        if (it != g_instance_dispatch_map.end()) {
+            m_dispatch = it->second;
+        }
+    }
+
+    if (!m_dispatch) {
+        MONOEYE_LOG_ERROR("Failed to find dispatch table for instance %p", (void*)instance);
+        return;
+    }
+
+
     MONOEYE_LOG("Initializing OverlayManager...");
 
     // 1. Create OpenXR Swapchain for UI (1024x1024)
@@ -32,7 +47,9 @@ void OverlayManager::initialize(XrInstance instance, XrSession session, VkDevice
     swapchainInfo.arraySize = 1;
     swapchainInfo.mipCount = 1;
 
-    XrResult result = xrCreateSwapchain(m_xrSession, &swapchainInfo, &m_swapchain);
+    XrResult result = ((PFN_xrCreateSwapchain)m_dispatch->CreateSwapchain)(m_xrSession, &swapchainInfo, &m_swapchain);
+
+
     if (result != XR_SUCCESS) {
         MONOEYE_LOG_ERROR("Failed to create overlay swapchain: %d", result);
         return;
@@ -40,9 +57,11 @@ void OverlayManager::initialize(XrInstance instance, XrSession session, VkDevice
 
     // 2. Get swapchain images
     uint32_t imageCount = 0;
-    xrEnumerateSwapchainImages(m_swapchain, 0, &imageCount, nullptr);
+    ((PFN_xrEnumerateSwapchainImages)m_dispatch->EnumerateSwapchainImages)(m_swapchain, 0, &imageCount, nullptr);
     std::vector<XrSwapchainImageVulkanKHR> images(imageCount, {XR_TYPE_SWAPCHAIN_IMAGE_VULKAN_KHR});
-    xrEnumerateSwapchainImages(m_swapchain, imageCount, &imageCount, (XrSwapchainImageBaseHeader*)images.data());
+    ((PFN_xrEnumerateSwapchainImages)m_dispatch->EnumerateSwapchainImages)(m_swapchain, imageCount, &imageCount, (XrSwapchainImageBaseHeader*)images.data());
+
+
 
     for (uint32_t i = 0; i < imageCount; ++i) {
         m_images.push_back(images[i].image);
@@ -127,8 +146,10 @@ void OverlayManager::shutdown() {
     m_imageViews.clear();
     m_images.clear();
 
-    if (m_swapchain) {
-        xrDestroySwapchain(m_swapchain);
+    if (m_swapchain && m_dispatch) {
+        ((PFN_xrDestroySwapchain)m_dispatch->DestroySwapchain)(m_swapchain);
+
+
         m_swapchain = XR_NULL_HANDLE;
     }
 
@@ -181,6 +202,7 @@ void OverlayManager::end_frame(XrTime displayTime) {
             rightPressed = (GetAsyncKeyState(VK_RIGHT) & 0x8000) != 0;
 #endif
 
+
             if (upPressed) { m_menuIndex = (m_menuIndex - 1 + 4) % 4; lastKeyTime = currentTime; }
             if (downPressed) { m_menuIndex = (m_menuIndex + 1) % 4; lastKeyTime = currentTime; }
             
@@ -208,12 +230,21 @@ void OverlayManager::end_frame(XrTime displayTime) {
             ImGui::TextColored(ImVec4(1, 1, 0, 1), "> %s", options[i]);
             
             // Handle Toggle for HUD
-            if (i == 3 && (GetAsyncKeyState(VK_RIGHT) & 0x8000)) m_showHud = true;
-            if (i == 3 && (GetAsyncKeyState(VK_LEFT) & 0x8000)) m_showHud = false;
+            if (i == 3) {
+                bool rightPressed = false;
+                bool leftPressed = false;
+#ifdef _WIN32
+                rightPressed = (GetAsyncKeyState(VK_RIGHT) & 0x8000) != 0;
+                leftPressed = (GetAsyncKeyState(VK_LEFT) & 0x8000) != 0;
+#endif
+                if (rightPressed) m_showHud = true;
+                if (leftPressed) m_showHud = false;
+            }
         } else {
             ImGui::Text("  %s", options[i]);
         }
     }
+
     
     ImGui::End();
 
@@ -238,17 +269,19 @@ void OverlayManager::end_frame(XrTime displayTime) {
 
     // 4. Acquire swapchain image and record draw commands
     uint32_t imageIndex;
-    xrAcquireSwapchainImage(m_swapchain, nullptr, &imageIndex);
+    ((PFN_xrAcquireSwapchainImage)m_dispatch->AcquireSwapchainImage)(m_swapchain, nullptr, &imageIndex);
     
     XrSwapchainImageWaitInfo waitInfo = {XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO};
     waitInfo.timeout = XR_INFINITE_DURATION;
-    xrWaitSwapchainImage(m_swapchain, &waitInfo);
-
+    ((PFN_xrWaitSwapchainImage)m_dispatch->WaitSwapchainImage)(m_swapchain, &waitInfo);
+    
     // Placeholder: We need a command buffer and a way to submit to the queue
     // For alpha, we just release the image. Full rendering implementation follows in v0.5.1
     // To ensure build passes, we keep it simple but safe.
 
-    xrReleaseSwapchainImage(m_swapchain, nullptr);
+    ((PFN_xrReleaseSwapchainImage)m_dispatch->ReleaseSwapchainImage)(m_swapchain, nullptr);
+
+
 }
 
 const XrCompositionLayerBaseHeader* OverlayManager::get_composition_layer() {
