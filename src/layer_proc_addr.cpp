@@ -197,9 +197,11 @@ XrResult LayerXrGetInstanceProcAddr(
         }
     }
 
-    if (dispatch && dispatch->xrGetInstanceProcAddr &&
-        dispatch->xrGetInstanceProcAddr != (PFN_xrGetInstanceProcAddr)LayerXrGetInstanceProcAddr) {
-        return dispatch->xrGetInstanceProcAddr(instance, name, function);
+    if (dispatch && dispatch->xrGetInstanceProcAddr) {
+        auto real = (PFN_xrGetInstanceProcAddr)dispatch->xrGetInstanceProcAddr;
+        if (real != LayerXrGetInstanceProcAddr) {
+            return real(instance, name, function);
+        }
     }
 
     MONOEYE_LOG_ERROR("xrGetInstanceProcAddr: no downstream handler for '%s'", name);
