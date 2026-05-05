@@ -621,8 +621,9 @@ namespace MonoEyeSwitcher
                 }
             }
         }
+    }
 
-        private void SaveLogButton_Click(object sender, EventArgs e)
+    private void SaveLogButton_Click(object sender, EventArgs e)
         {
             try
             {
