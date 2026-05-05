@@ -84,8 +84,12 @@ monoeye_xrCreateSession(XrInstance instance,
           if (dispatch->xrGetVulkanGraphicsDevice2KHR) {
             ((PFN_xrGetVulkanGraphicsDevice2KHR)
                  dispatch->xrGetVulkanGraphicsDevice2KHR)(instance, &getInfo,
-                                                        &physicalDevice);
+                                                          &physicalDevice);
+          } else if (dispatch->xrGetVulkanGraphicsDeviceKHR) {
+            ((PFN_xrGetVulkanGraphicsDeviceKHR)
+                 dispatch->xrGetVulkanGraphicsDeviceKHR)(instance, createInfo->systemId, vb->instance, &physicalDevice);
           }
+
 
           // Initialize the warp pipeline with this Vulkan device
           WarpPipeline::get_instance().initialize(
