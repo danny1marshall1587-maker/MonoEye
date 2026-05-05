@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 
 echo ========================================
-echo   MonoEye Installer
+echo   MonoEye Installer v0.5.8
 echo   Single-eye VR rendering
 echo ========================================
 echo.
