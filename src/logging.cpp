@@ -64,13 +64,16 @@ void monoeye_log(LogLevel level, const char* file, int line, const char* fmt, ..
         }
 #endif
         if (log_path[0] != '\0') {
-            s_log_file = fopen(log_path, "a"); // Append mode
+            s_log_file = fopen(log_path, "w"); // Overwrite mode for "Full Debug" to avoid massive files
             if (s_log_file) {
-                fprintf(s_log_file, "\n--- MonoEye Log Session Started ---\n");
+                fprintf(s_log_file, "=== MonoEye Full Debug Log ===\n");
+                fprintf(s_log_file, "Build Date: %s %s\n", __DATE__, __TIME__);
+                fprintf(s_log_file, "==============================\n\n");
             }
         }
         s_log_initialized = true;
     }
+
 
 
     // Get timestamp
@@ -137,9 +140,12 @@ LogLevel get_log_level() {
                 case 'i': case 'I': s_log_level = LOG_INFO;  break;
                 case 'w': case 'W': s_log_level = LOG_WARN;  break;
                 case 'e': case 'E': s_log_level = LOG_ERROR; break;
-                default: s_log_level = LOG_INFO; break;
+                default: s_log_level = LOG_DEBUG; break;
             }
+        } else {
+            s_log_level = LOG_DEBUG; // Default to full debug for now
         }
+
         s_log_initialized = true;
     }
     return s_log_level;
