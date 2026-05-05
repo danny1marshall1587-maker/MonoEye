@@ -481,6 +481,8 @@ namespace MonoEyeSwitcher
                     MessageBoxIcon.Error
                 );
             }
+        }
+
         private void FixRaceRoomButton_Click(object sender, EventArgs e)
         {
             MessageBox.Show(
@@ -500,6 +502,9 @@ namespace MonoEyeSwitcher
                 "Sim Racing Toolbox",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information
+            );
+        }
+
         private void SelectGameFolderButton_Click(object sender, EventArgs e)
         {
             using (var fbd = new FolderBrowserDialog())
