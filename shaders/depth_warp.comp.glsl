@@ -34,6 +34,7 @@ layout(push_constant) uniform PushConstants {
 
 // Shared between invocations for temporal filtering
 layout(binding = 3, set = 0, rgba8) uniform image2D previousFrame;
+layout(binding = 4, set = 0) uniform sampler2D motionVectors;
 
 // High-quality Sharpening (RCAS inspired)
 vec3 applySharpening(vec2 uv, vec3 centerColor) {
@@ -146,14 +147,21 @@ void main() {
                 color = applySharpening(shiftedUV, color);
             }
             
-            // --- TEMPORAL STABILIZATION ---
-            if (pc.frameIndex > 0) {
-                // Simple Exponential Moving Average (EMA) for stability
-                // We sample the previous frame at the current pixel coord
-                // (Future: Use motion vectors to sample at the reprojected position)
-                vec3 prevColor = imageLoad(previousFrame, pixelCoord).rgb;
-                
-                // Only blend if the colors are somewhat similar (reject ghosting on fast motion)
+        // --- TEMPORAL STABILIZATION ---
+        if (pc.frameIndex > 0) {
+            vec3 prevColor;
+            
+            if (pc.hasMotionBuffer == 1) {
+                // Use motion vectors to sample the previous frame at the reprojected position
+                vec2 motion = texture(motionVectors, shiftedUV).rg;
+                ivec2 prevPixelCoord = pixelCoord - ivec2(motion * vec2(imageSize));
+                prevColor = imageLoad(previousFrame, prevPixelCoord).rgb;
+            } else {
+                // Fallback: Use current pixel coordinate
+                prevColor = imageLoad(previousFrame, pixelCoord).rgb;
+            }
+            
+            // Only blend if the colors are somewhat similar (reject ghosting on fast motion)
                 float diff = distance(color, prevColor);
                 float blendFactor = clamp(1.0 - diff * 2.0, 0.5, 0.95);
                 

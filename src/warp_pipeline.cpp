@@ -21,6 +21,7 @@ struct WarpPushConstants {
     float farZ;
     float focalLength;
     uint32_t hasDepthBuffer;
+    uint32_t hasMotionBuffer;
     uint32_t qualityMode;
     uint32_t showIndicator;
     uint32_t tensorEnabled;
@@ -226,12 +227,11 @@ void WarpPipeline::shutdown() {
 
 VkResult WarpPipeline::create_descriptor_resources() {
     // Descriptor set layout:
-    // Binding 0: left eye color (sampled image)
-    // Binding 1: left eye depth (sampled image)
     // Binding 2: right eye output (storage image)
     // Binding 3: previous frame (storage image for accumulation)
+    // Binding 4: motion vectors (sampled image)
 
-    VkDescriptorSetLayoutBinding bindings[4] = {};
+    VkDescriptorSetLayoutBinding bindings[5] = {};
 
     bindings[0].binding = 0;
     bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
@@ -253,9 +253,14 @@ VkResult WarpPipeline::create_descriptor_resources() {
     bindings[3].descriptorCount = 1;
     bindings[3].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
+    bindings[4].binding = 4;
+    bindings[4].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+    bindings[4].descriptorCount = 1;
+    bindings[4].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
     VkDescriptorSetLayoutCreateInfo layoutInfo = {};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 4;
+    layoutInfo.bindingCount = 5;
     layoutInfo.pBindings = bindings;
 
     VkResult result = vkCreateDescriptorSetLayout(m_vkDevice, &layoutInfo, nullptr, &m_descriptorSetLayout);
@@ -266,7 +271,7 @@ VkResult WarpPipeline::create_descriptor_resources() {
     // Create descriptor pool
     VkDescriptorPoolSize poolSizes[2] = {};
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-    poolSizes[0].descriptorCount = 2;
+    poolSizes[0].descriptorCount = 3; // Color + Depth + Motion
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
     poolSizes[1].descriptorCount = 2; // Output + Temporal
 
@@ -356,6 +361,7 @@ VkResult WarpPipeline::create_compute_pipeline() {
 VkResult WarpPipeline::execute_warp(
     SwapchainImageInfo* leftColor,
     SwapchainImageInfo* leftDepth,
+    SwapchainImageInfo* leftMotion,
     SwapchainImageInfo* rightColor,
     XrTime displayTime
 ) {
@@ -390,9 +396,10 @@ VkResult WarpPipeline::execute_warp(
     uint32_t leftDepthIdx = leftDepth ? 0 : 0;
 
     // Create image views
-    VkImageView leftColorView = VK_NULL_HANDLE;
-    VkImageView leftDepthView = VK_NULL_HANDLE;
-    VkImageView rightColorView = VK_NULL_HANDLE;
+    VkImageView leftColorView = SwapchainTracker::get_instance().get_current_view(leftColor);
+    VkImageView leftDepthView = leftDepth ? SwapchainTracker::get_instance().get_current_view(leftDepth) : VK_NULL_HANDLE;
+    VkImageView leftMotionView = leftMotion ? SwapchainTracker::get_instance().get_current_view(leftMotion) : VK_NULL_HANDLE;
+    VkImageView rightColorView = SwapchainTracker::get_instance().get_current_view(rightColor);
 
     // Use a format appropriate for the swapchain
     VkFormat colorFormat = VK_FORMAT_R8G8B8A8_SRGB; // Will be overridden based on actual format
@@ -400,13 +407,6 @@ VkResult WarpPipeline::execute_warp(
 
     // For now, create views with assumed formats. In production, derive from createInfo.format
     // OpenXR format -> Vulkan format mapping would be needed here
-    create_image_view(leftColor->vulkanImages[leftColorIdx], colorFormat, &leftColorView);
-
-    if (leftDepth && !leftDepth->vulkanImages.empty()) {
-        create_image_view(leftDepth->vulkanImages[leftDepthIdx], depthFormat, &leftDepthView);
-    }
-
-    create_image_view(rightColor->vulkanImages[rightColorIdx], colorFormat, &rightColorView);
 
     if (!leftColorView || !rightColorView) {
         MONOEYE_LOG_ERROR("Failed to create image views for warp");
@@ -464,13 +464,25 @@ VkResult WarpPipeline::execute_warp(
     vkUpdateDescriptorSets(m_vkDevice, 3, writes, 0, nullptr);
     vkUpdateDescriptorSets(m_vkDevice, 1, &temporalWrite, 0, nullptr);
 
-    // Record and submit the compute command
-    VkResult result = record_compute_command(leftColorView, leftDepthView, rightColorView, width, height);
+    if (leftMotionView) {
+        VkDescriptorImageInfo motionInfo = {};
+        motionInfo.imageView = leftMotionView;
+        motionInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        motionInfo.sampler = m_sampler;
 
-    // Clean up image views
-    if (leftColorView) vkDestroyImageView(m_vkDevice, leftColorView, nullptr);
-    if (leftDepthView) vkDestroyImageView(m_vkDevice, leftDepthView, nullptr);
-    if (rightColorView) vkDestroyImageView(m_vkDevice, rightColorView, nullptr);
+        VkWriteDescriptorSet motionWrite = {};
+        motionWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        motionWrite.dstSet = m_descriptorSet;
+        motionWrite.dstBinding = 4;
+        motionWrite.descriptorCount = 1;
+        motionWrite.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+        motionWrite.pImageInfo = &motionInfo;
+
+        vkUpdateDescriptorSets(m_vkDevice, 1, &motionWrite, 0, nullptr);
+    }
+
+    // Record and submit the compute command
+    VkResult result = record_compute_command(leftColorView, leftDepthView, leftMotionView, rightColorView, width, height);
 
     return result;
 }
@@ -478,6 +490,7 @@ VkResult WarpPipeline::execute_warp(
 VkResult WarpPipeline::record_compute_command(
     VkImageView leftColorView,
     VkImageView leftDepthView,
+    VkImageView leftMotionView,
     VkImageView rightColorView,
     uint32_t width,
     uint32_t height
@@ -511,7 +524,8 @@ VkResult WarpPipeline::record_compute_command(
     pc.nearZ = 0.1f;    // Default near plane
     pc.farZ = 1000.0f;  // Default far plane
     pc.focalLength = 1.0f;
-    pc.hasDepthBuffer = leftDepth ? 1 : 0;
+    pc.hasDepthBuffer = leftDepthView ? 1 : 0;
+    pc.hasMotionBuffer = leftMotionView ? 1 : 0;
     pc.qualityMode = (uint32_t)config.warp_quality;
     pc.showIndicator = config.show_indicator ? 1 : 0;
     pc.tensorEnabled = (config.tensor_stabilization && m_hasTensorCores) ? 1 : 0;

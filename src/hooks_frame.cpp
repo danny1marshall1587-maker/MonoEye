@@ -135,15 +135,19 @@ extern "C" XrResult monoeye_xrEndFrame(
                     if (rightSwapchain != XR_NULL_HANDLE) {
                         newViews[1].subImage.swapchain = rightSwapchain;
                         
-                        // 2. Perform the depth warp
                         SwapchainImageInfo* leftDepthInfo = nullptr;
+                        SwapchainImageInfo* leftMotionInfo = nullptr;
                         const XrBaseInStructure* next = reinterpret_cast<const XrBaseInStructure*>(newViews[0].next);
                         while (next) {
                             if (next->type == XR_TYPE_COMPOSITION_LAYER_DEPTH_INFO_KHR) {
                                 const XrCompositionLayerDepthInfoKHR* depthInfo = 
                                     reinterpret_cast<const XrCompositionLayerDepthInfoKHR*>(next);
                                 leftDepthInfo = SwapchainTracker::get_instance().get_info(depthInfo->subImage.swapchain);
-                                break;
+                            }
+                            else if (next->type == XR_TYPE_COMPOSITION_LAYER_MOTION_VECTOR_KHR) {
+                                const XrCompositionLayerMotionVectorKHR* mvInfo = 
+                                    reinterpret_cast<const XrCompositionLayerMotionVectorKHR*>(next);
+                                leftMotionInfo = SwapchainTracker::get_instance().get_info(mvInfo->colorSubImage.swapchain);
                             }
                             next = next->next;
                         }
@@ -152,7 +156,7 @@ extern "C" XrResult monoeye_xrEndFrame(
                         
                         if (rightInfo) {
                             WarpPipeline::get_instance().execute_warp(
-                                leftInfo, leftDepthInfo, rightInfo, frameEndInfo->displayTime);
+                                leftInfo, leftDepthInfo, leftMotionInfo, rightInfo, frameEndInfo->displayTime);
                         }
                     }
                 }

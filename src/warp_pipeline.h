@@ -46,6 +46,7 @@ public:
     VkResult execute_warp(
         SwapchainImageInfo* leftColor,
         SwapchainImageInfo* leftDepth,
+        SwapchainImageInfo* leftMotion,
         SwapchainImageInfo* rightColor,
         XrTime displayTime
     );
@@ -79,6 +80,7 @@ private:
     VkResult record_compute_command(
         VkImageView leftColorView,
         VkImageView leftDepthView,
+        VkImageView leftMotionView,
         VkImageView rightColorView,
         uint32_t width,
         uint32_t height
