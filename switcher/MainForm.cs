@@ -22,9 +22,8 @@ namespace MonoEyeSwitcher
         private Label leftEyeLabel;
         private Label titleLabel;
         private Label infoLabel;
-        private Label openVrLabel;
-        private Button fixAms2Button;
         private GroupBox openVrInstallerGroupBox;
+
         private Button selectGameFolderButton;
         private Label gameFolderLabel;
         private Button saveButton;
@@ -182,7 +181,6 @@ namespace MonoEyeSwitcher
             };
             this.Controls.Add(indicatorCheckbox);
 
-            this.Controls.Add(openVrLabel);
 
             // --- v3 Advanced Clarity Section ---
             GroupBox v3Group = new GroupBox
@@ -229,7 +227,8 @@ namespace MonoEyeSwitcher
             v3Group.Controls.Add(edgeCheckbox);
 
             // Save button
-            Button saveButton = new Button
+            saveButton = new Button
+
             {
                 Text = "Apply Settings",
                 Size = new Size(360, 35),
