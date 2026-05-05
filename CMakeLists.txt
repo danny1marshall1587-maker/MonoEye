@@ -165,14 +165,16 @@ target_include_directories(monoeye PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui
 )
 
-# Build the OpenVR Proxy DLL
-add_library(openvr_api SHARED 
-    src/openvr_proxy/openvr_proxy.cpp
-    src/logging.cpp
-)
-target_include_directories(openvr_api PRIVATE external/openvr/headers)
-target_link_libraries(openvr_api PRIVATE Vulkan::Vulkan)
-set_target_properties(openvr_api PROPERTIES PREFIX "") # Remove 'lib' prefix
+# Build the OpenVR Proxy DLL (Windows Only)
+if(WIN32)
+    add_library(openvr_api SHARED 
+        src/openvr_proxy/openvr_proxy.cpp
+        src/logging.cpp
+    )
+    target_include_directories(openvr_api PRIVATE external/openvr/headers)
+    target_link_libraries(openvr_api PRIVATE Vulkan::Vulkan)
+    set_target_properties(openvr_api PROPERTIES PREFIX "") # Remove 'lib' prefix
+endif()
 
 if(MONOEYE_EMBED_SHADERS)
     target_sources(monoeye PRIVATE ${SHADER_HEADERS})

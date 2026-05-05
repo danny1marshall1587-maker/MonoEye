@@ -105,14 +105,14 @@ void main() {
 
     // Convert normalized depth to world distance
     // OpenXR depth format: depth values are in [nearZ, farZ]
-    float depth = pc.nearZ * pc.farZ / (pc.farZ - depthSample * (pc.farZ - pc.nearZ));
+    float depthWorld = pc.nearZ * pc.farZ / (pc.farZ - depthSample * (pc.farZ - pc.nearZ));
     
     // Safety check for depth
-    depth = max(depth, pc.nearZ);
-
+    depthWorld = max(depthWorld, pc.nearZ);
+    
     // Calculate parallax shift for right eye
     // shift = IPD / depth (in normalized screen space)
-    float parallaxShift = pc.ipd / depth;
+    float parallaxShift = pc.ipd / depthWorld;
 
     // Convert to UV space (depends on FOV)
     // Simplified UV shift calculation
