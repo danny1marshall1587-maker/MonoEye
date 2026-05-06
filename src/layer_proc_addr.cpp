@@ -108,7 +108,7 @@ extern "C" XrResult monoeye_xrGetVulkanGraphicsRequirementsKHR(
 
 extern "C" XrResult monoeye_xrGetVulkanGraphicsRequirements2KHR(
     XrInstance instance,
-    const XrVulkanGraphicsRequirementsGetInfoKHR* getInfo,
+    XrSystemId systemId,
     XrGraphicsRequirementsVulkanKHR* graphicsRequirements
 ) {
     monoeye::XrGeneratedDispatchTable* dispatch = nullptr;
@@ -124,8 +124,9 @@ extern "C" XrResult monoeye_xrGetVulkanGraphicsRequirements2KHR(
         return XR_ERROR_RUNTIME_FAILURE;
     }
 
-    return ((PFN_xrGetVulkanGraphicsRequirements2KHR)dispatch->xrGetVulkanGraphicsRequirements2KHR)(instance, getInfo, graphicsRequirements);
+    return ((PFN_xrGetVulkanGraphicsRequirements2KHR)dispatch->xrGetVulkanGraphicsRequirements2KHR)(instance, systemId, graphicsRequirements);
 }
+
 
 extern "C" XrResult monoeye_xrGetVulkanGraphicsDeviceKHR(
     XrInstance instance,
