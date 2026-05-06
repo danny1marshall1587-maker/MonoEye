@@ -2,7 +2,7 @@ name: Build MonoEye
 
 on:
   push:
-    branches: [ main, master, develop ]
+    branches: [ main, master, develop, v0.3-tensor-stabilization ]
     tags: [ 'v*' ]
   pull_request:
     branches: [ main, master ]
