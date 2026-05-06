@@ -13,6 +13,24 @@ namespace monoeye {
 PFN_xrGetInstanceProcAddr g_nextGetInstanceProcAddr = nullptr;
 }
 
+#ifdef _WIN32
+#include <windows.h>
+BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
+    switch (fdwReason) {
+        case DLL_PROCESS_ATTACH:
+            // Disable thread library calls to avoid unnecessary overhead
+            DisableThreadLibraryCalls(hinstDLL);
+            // Early log to confirm the DLL is loaded in the process
+            MONOEYE_LOG("--- MonoEye DLL Attached to Process ---");
+            break;
+        case DLL_PROCESS_DETACH:
+            MONOEYE_LOG("--- MonoEye DLL Detached from Process ---");
+            break;
+    }
+    return TRUE;
+}
+#endif
+
 // The core negotiation function - this is the only function the loader calls
 // directly from our DLL via GetProcAddress. Everything else goes through
 // xrGetInstanceProcAddr.
