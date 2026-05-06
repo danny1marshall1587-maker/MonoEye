@@ -64,6 +64,7 @@ jobs:
           Copy-Item README.md release\
           Copy-Item LICENSE release\
           Copy-Item switcher-output\MonoEyeSwitcher.exe release\
+          Copy-Item build\Release\monoeye_validator.exe release\
           Copy-Item install\windows\install.bat release\
           Copy-Item install\windows\uninstall.bat release\
           Copy-Item install\windows\clean_layers.bat release\

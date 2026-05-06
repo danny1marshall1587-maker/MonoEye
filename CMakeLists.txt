@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.18)
 project(MonoEye
-    VERSION 0.5.33
+    VERSION 0.5.40
 
     DESCRIPTION "MonoEye - Single-eye VR rendering with depth-based second eye reconstruction"
     LANGUAGES CXX
@@ -253,4 +253,20 @@ configure_file(
     ${CMAKE_CURRENT_SOURCE_DIR}/manifest/XR_APILAYER_NOVENDOR_monoeye.json
     ${CMAKE_CURRENT_BINARY_DIR}/XR_APILAYER_NOVENDOR_monoeye.json
     @ONLY
+)
+# Build the validator tool
+add_executable(monoeye_validator
+    src/tools/layer_validator.cpp
+)
+target_link_libraries(monoeye_validator PRIVATE
+    openxr_headers
+    Vulkan::Vulkan
+)
+if(WIN32)
+    # Link to the OpenXR loader on Windows to test system-wide loading
+    # (The user might need to have the loader DLL available)
+endif()
+
+install(TARGETS monoeye_validator
+    DESTINATION ${MONOEYE_INSTALL_DIR}
 )
