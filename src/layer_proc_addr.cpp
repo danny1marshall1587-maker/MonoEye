@@ -130,6 +130,7 @@ extern "C" XrResult monoeye_xrGetVulkanGraphicsDevice2KHR(
 
 }
 
+#ifdef _WIN32
 extern "C" XrResult monoeye_xrGetD3D11GraphicsRequirementsKHR(
     XrInstance instance,
     XrSystemId systemId,
@@ -163,6 +164,7 @@ extern "C" XrResult monoeye_xrGetD3D12GraphicsRequirementsKHR(
     if (!dispatch || !dispatch->xrGetD3D12GraphicsRequirementsKHR) return XR_ERROR_RUNTIME_FAILURE;
     return ((PFN_xrGetD3D12GraphicsRequirementsKHR)dispatch->xrGetD3D12GraphicsRequirementsKHR)(instance, systemId, graphicsRequirements);
 }
+#endif
 
 namespace monoeye {
 
@@ -187,10 +189,10 @@ static const HookedFunction s_hooked_functions[] = {
     {"xrGetVulkanGraphicsRequirementsKHR",  (PFN_xrVoidFunction)monoeye_xrGetVulkanGraphicsRequirements2KHR},
     {"xrGetVulkanGraphicsDevice2KHR",       (PFN_xrVoidFunction)monoeye_xrGetVulkanGraphicsDevice2KHR},
     {"xrGetVulkanGraphicsDeviceKHR",        (PFN_xrVoidFunction)monoeye_xrGetVulkanGraphicsDevice2KHR},
-    
-    {"xrGetD3D11GraphicsRequirementsKHR",   (PFN_xrVoidFunction)monoeye_xrGetD3D11GraphicsRequirementsKHR},
-    {"xrGetD3D12GraphicsRequirementsKHR",   (PFN_xrVoidFunction)monoeye_xrGetD3D12GraphicsRequirementsKHR},
-
+#ifdef _WIN32
+    {"xrGetD3D11GraphicsRequirementsKHR", (PFN_xrVoidFunction)monoeye_xrGetD3D11GraphicsRequirementsKHR},
+    {"xrGetD3D12GraphicsRequirementsKHR", (PFN_xrVoidFunction)monoeye_xrGetD3D12GraphicsRequirementsKHR},
+#endif
     {"xrEnumerateViewConfigurationViews",   (PFN_xrVoidFunction)monoeye_xrEnumerateViewConfigurationViews},
     {"xrLocateViews",                       (PFN_xrVoidFunction)monoeye_xrLocateViews},
     {nullptr, nullptr}

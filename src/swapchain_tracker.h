@@ -19,6 +19,7 @@
 #include <unordered_map>
 
 #include "dispatch_table.h"
+#include "layer.h"
 
 namespace monoeye {
 

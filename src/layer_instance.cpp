@@ -127,6 +127,13 @@ XrResult LayerXrCreateApiLayerInstance(
     nextGetInstanceProcAddr(*instance, "xrGetVulkanGraphicsDeviceKHR",
         (PFN_xrVoidFunction*)&nextDispatch->xrGetVulkanGraphicsDeviceKHR);
 
+#ifdef _WIN32
+    nextGetInstanceProcAddr(*instance, "xrGetD3D11GraphicsRequirementsKHR",
+        (PFN_xrVoidFunction*)&nextDispatch->xrGetD3D11GraphicsRequirementsKHR);
+    nextGetInstanceProcAddr(*instance, "xrGetD3D12GraphicsRequirementsKHR",
+        (PFN_xrVoidFunction*)&nextDispatch->xrGetD3D12GraphicsRequirementsKHR);
+#endif
+
     {
         std::lock_guard<std::mutex> lock(g_instance_dispatch_mutex);
         g_instance_dispatch_map[*instance] = nextDispatch;

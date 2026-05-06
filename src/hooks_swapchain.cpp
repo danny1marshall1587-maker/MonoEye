@@ -13,18 +13,6 @@
 
 namespace monoeye {
 
-enum SessionType {
-    SESSION_VULKAN,
-    SESSION_D3D11,
-    SESSION_D3D12,
-    SESSION_UNKNOWN
-};
-
-struct SessionState {
-    XrInstance instance;
-    SessionType type;
-};
-
 // Track which instance owns each session and its graphics API
 extern std::mutex s_session_map_mutex;
 extern std::unordered_map<XrSession, SessionState> s_session_map;
@@ -83,13 +71,16 @@ extern "C" XrResult monoeye_xrCreateSwapchain(
             if (sessionType == SESSION_VULKAN) {
                 imageType = XR_TYPE_SWAPCHAIN_IMAGE_VULKAN_KHR;
                 structSize = sizeof(XrSwapchainImageVulkanKHR);
-            } else if (sessionType == SESSION_D3D11) {
+            } 
+#ifdef _WIN32
+            else if (sessionType == SESSION_D3D11) {
                 imageType = XR_TYPE_SWAPCHAIN_IMAGE_D3D11_KHR;
                 structSize = sizeof(XrSwapchainImageD3D11KHR);
             } else if (sessionType == SESSION_D3D12) {
                 imageType = XR_TYPE_SWAPCHAIN_IMAGE_D3D12_KHR;
                 structSize = sizeof(XrSwapchainImageD3D12KHR);
             }
+#endif
 
             if (structSize > 0) {
                 buffer.resize(imageCount * structSize);

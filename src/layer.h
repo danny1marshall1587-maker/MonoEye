@@ -55,6 +55,18 @@ extern "C" MONOEYE_EXPORT XrResult xrNegotiateLoaderApiLayerInterface(
 
 namespace monoeye {
 
+enum SessionType {
+    SESSION_VULKAN,
+    SESSION_D3D11,
+    SESSION_D3D12,
+    SESSION_UNKNOWN
+};
+
+struct SessionState {
+    XrInstance instance;
+    SessionType type;
+};
+
 // Global next GetInstanceProcAddr for NULL-instance calls
 extern PFN_xrGetInstanceProcAddr g_nextGetInstanceProcAddr;
 

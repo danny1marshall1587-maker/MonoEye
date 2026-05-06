@@ -18,12 +18,17 @@
 
 // Include the generated dispatch table definition
 #include "xr_generated_dispatch_table.h"
+#include "layer.h"
 
 namespace monoeye {
 
 // Global dispatch table map: instance -> dispatch table
 extern std::unordered_map<XrInstance, XrGeneratedDispatchTable*> g_instance_dispatch_map;
 extern std::mutex g_instance_dispatch_mutex;
+
+// Track which instance owns each session and its graphics API
+extern std::unordered_map<XrSession, SessionState> s_session_map;
+extern std::mutex s_session_map_mutex;
 
 // Generated function that populates the dispatch table
 void GeneratedXrPopulateDispatchTable(

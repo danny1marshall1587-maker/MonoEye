@@ -16,7 +16,7 @@
 namespace monoeye {
 
 extern std::mutex s_session_map_mutex;
-extern std::unordered_map<XrSession, XrInstance> s_session_map;
+extern std::unordered_map<XrSession, SessionState> s_session_map;
 
 // Frame state tracking
 static std::mutex s_frame_mutex;
