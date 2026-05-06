@@ -2,21 +2,13 @@
 setlocal enabledelayedexpansion
 
 echo ===================================================
-echo   OpenXR API Layer Cleanup Utility
+echo   MonoEye Absolute Cleanup Tool
 echo ===================================================
-echo This utility will UNREGISTER all OpenXR API layers 
-echo from your Windows Registry to resolve conflicts.
+echo This utility will PURGE all MonoEye registrations
+echo and environment variables from your system.
 echo.
-echo This affects:
-echo   - Old MonoEye versions
-echo   - Current MonoEye installation
-echo   - SteamVR API layers (will re-register on next run)
-echo   - Other 3rd party layers
+echo WARNING: Run this ONLY if you are doing a clean install.
 echo.
-echo WARNING: This will NOT delete any files, only unregister
-echo the layers from the OpenXR loader.
-echo.
-pause
 
 :: Check for admin privileges
 net session >nul 2>&1
@@ -30,7 +22,7 @@ if %errorLevel% neq 0 (
 )
 
 echo.
-echo [1/3] Cleaning OpenXR Registry Keys...
+echo [1/3] Removing MonoEye Registry Entries...
 
 :: Define all possible OpenXR layer registry paths
 set "KEYS="
@@ -42,45 +34,35 @@ set "KEYS=!KEYS! HKLM\SOFTWARE\WOW6432Node\Khronos\OpenXR\1\ApiLayers\Implicit"
 set "KEYS=!KEYS! HKLM\SOFTWARE\WOW6432Node\Khronos\OpenXR\1\ApiLayers\Explicit"
 
 for %%K in (%KEYS%) do (
-    echo   - Clearing %%K...
-    :: Delete the key and all its values
-    reg delete "%%K" /f >nul 2>&1
-    :: Recreate the empty key so the loader doesn't complain about missing keys (though it should be fine)
-    reg add "%%K" /f >nul 2>&1
+    echo   - Scrubbing %%K...
+    for /f "tokens=*" %%V in ('reg query "%%K" 2^>nul ^| findstr /i "monoeye"') do (
+        echo     Removing: %%V
+        reg delete "%%K" /v "%%V" /f >nul 2>&1
+    )
 )
 
 echo.
-echo [2/3] Cleaning MonoEye Environment Variables...
+echo [2/3] Cleaning Environment Variables...
 :: List of all known MonoEye environment variables
-set "VARS=MONOEYE_ENABLE MONOEYE_QUALITY MONOEYE_LEFT_EYE MONOEYE_INDICATOR MONOEYE_TENSOR_STABILIZATION MONOEYE_SPECULAR_REJECTION MONOEYE_EDGE_SMOOTHING MONOEYE_LOG_ENABLED MONOEYE_LOG_LEVEL MONOEYE_AMS2_STABILIZE MONOEYE_DISABLE"
+set "VARS=MONOEYE_ENABLE MONOEYE_QUALITY MONOEYE_LEFT_EYE MONOEYE_INDICATOR MONOEYE_TENSOR_STABILIZATION MONOEYE_SPECULAR_REJECTION MONOEYE_EDGE_SMOOTHING MONOEYE_LOG_ENABLED MONOEYE_LOG_LEVEL MONOEYE_AMS2_STABILIZE MONOEYE_DISABLE XR_API_LAYER_PATH"
 
 for %%V in (%VARS%) do (
-    echo   - Removing %%V...
-    :: Remove from System (requires admin, which we have)
-    setx %%V "" /M >nul 2>&1
-    :: Remove from User
-    setx %%V "" >nul 2>&1
-    :: Clear from current session
+    echo   - Clearing %%V...
+    reg delete "HKCU\Environment" /v %%V /f >nul 2>&1
+    reg delete "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v %%V /f >nul 2>&1
     set %%V=
 )
 
 echo.
-echo [3/3] Checking for forced API Layer paths...
-setx XR_API_LAYER_PATH "" /M >nul 2>&1
-setx XR_API_LAYER_PATH "" >nul 2>&1
-set XR_API_LAYER_PATH=
-
+echo [3/3] Cleanup complete.
 echo.
 echo ===================================================
-echo   CLEANUP COMPLETE
+echo   IMPORTANT: MANUAL STEPS REQUIRED
 echo ===================================================
-echo Your Windows environment has been cleaned of OpenXR 
-echo API layer registrations.
+echo This tool cleared the registry, but you must now:
 echo.
-echo NEXT STEPS:
-echo 1. (Optional) Restart your computer.
-echo 2. Launch SteamVR - it will automatically re-register
-echo    its own required layers.
-echo 3. Perform your clean install of MonoEye.
+echo 1. DELETE all your old "MonoEye" folders manually.
+echo 2. Extract the NEW v0.5.17 zip to a fresh folder.
+echo 3. Run the Switcher from the new folder.
 echo.
 pause

@@ -42,7 +42,7 @@ namespace MonoEyeSwitcher
 
         private void InitializeComponent()
         {
-            this.Text = "MonoEye Switcher v0.5.16 (Alpha)";
+            this.Text = "MonoEye Switcher v0.5.17 (Alpha)";
             this.Size = new Size(420, 560);
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
@@ -392,8 +392,26 @@ namespace MonoEyeSwitcher
         {
             try
             {
-                string envValue = Environment.GetEnvironmentVariable("MONOEYE_ENABLE", EnvironmentVariableTarget.Machine);
-                isEnabled = envValue == "1";
+                string jsonPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "XR_APILAYER_NOVENDOR_monoeye.json");
+                string dllPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "XR_APILAYER_NOVENDOR_monoeye.dll");
+
+                // Check Registry for actual activation status
+                bool isRegistered = false;
+                string subKey = @"SOFTWARE\Khronos\OpenXR\1\ApiLayers\Implicit";
+                try {
+                    using (RegistryKey key = Registry.LocalMachine.OpenSubKey(subKey))
+                    {
+                        if (key != null && key.GetValue(jsonPath) != null) isRegistered = true;
+                    }
+                    if (!isRegistered) {
+                        using (RegistryKey key = Registry.CurrentUser.OpenSubKey(subKey))
+                        {
+                            if (key != null && key.GetValue(jsonPath) != null) isRegistered = true;
+                        }
+                    }
+                } catch {}
+
+                isEnabled = isRegistered;
 
                 if (isEnabled)
                 {
@@ -410,8 +428,14 @@ namespace MonoEyeSwitcher
                     toggleButton.BackColor = Color.FromArgb(0, 150, 220);
                 }
 
-                // Also check Registry
-                CheckRegistryStatus();
+                // Show DLL Build Info for user verification
+                if (System.IO.File.Exists(dllPath)) {
+                    DateTime buildDate = System.IO.File.GetLastWriteTime(dllPath);
+                    infoLabel.Text = $"DLL Date: {buildDate:MMM dd, HH:mm}\nPath: {AppDomain.CurrentDomain.BaseDirectory}";
+                } else {
+                    infoLabel.Text = "Warning: DLL not found in this folder!";
+                    infoLabel.ForeColor = Color.Orange;
+                }
 
                 // Check logging status
                 string logValue = Environment.GetEnvironmentVariable("MONOEYE_LOG_ENABLED", EnvironmentVariableTarget.Machine);
