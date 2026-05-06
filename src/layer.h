@@ -16,6 +16,8 @@
     #include <d3d12.h>
 #endif
 
+#include <vulkan/vulkan.h>
+
 // Platform-specific export macros
 #ifdef _WIN32
     #ifdef MONOEYE_EXPORTS
