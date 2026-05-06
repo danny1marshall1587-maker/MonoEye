@@ -5,7 +5,7 @@
 
 int main() {
     std::cout << "========================================" << std::endl;
-    echo "   MONOEYE LAYER VALIDATOR" << std::endl;
+    std::cout << "   MONOEYE LAYER VALIDATOR" << std::endl;
     std::cout << "========================================" << std::endl;
 
     // 1. Enumerate API Layers
@@ -17,7 +17,7 @@ int main() {
     bool found = false;
     std::cout << "Found " << layerCount << " OpenXR API Layers:" << std::endl;
     for (const auto& layer : layers) {
-        std::cout << " - " << layer.layerName << " (v" << layer.implementationVersion << "): " << layer.description << std::endl;
+        std::cout << " - " << layer.layerName << " (v" << layer.layerVersion << "): " << layer.description << std::endl;
         if (strcmp(layer.layerName, "XR_APILAYER_NOVENDOR_monoeye") == 0) {
             found = true;
         }
