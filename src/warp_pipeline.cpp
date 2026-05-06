@@ -27,6 +27,7 @@ struct WarpPushConstants {
     uint32_t tensorEnabled;
     uint32_t specularRejection;
     uint32_t edgeSmoothing;
+    uint32_t frameGenEnabled;
     float upscaleFactor;
     uint32_t frameIndex;
 };
@@ -545,6 +546,7 @@ VkResult WarpPipeline::record_compute_command(
     pc.tensorEnabled = (config.tensor_stabilization && m_hasTensorCores) ? 1 : 0;
     pc.specularRejection = config.specular_rejection ? 1 : 0;
     pc.edgeSmoothing = config.edge_smoothing ? 1 : 0;
+    pc.frameGenEnabled = config.frame_gen_enabled ? 1 : 0;
     pc.upscaleFactor = config.render_width_percent / 100.0f;
     pc.frameIndex = s_frame_index++;
 

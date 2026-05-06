@@ -158,7 +158,7 @@ extern "C" XrResult monoeye_xrEndFrame(
                             else if (next->type == XR_TYPE_COMPOSITION_LAYER_MOTION_VECTOR_KHR) {
                                 const XrCompositionLayerMotionVectorKHR* mvInfo = 
                                     reinterpret_cast<const XrCompositionLayerMotionVectorKHR*>(next);
-                                leftMotionInfo = SwapchainTracker::get_instance().get_info(mvInfo->colorSubImage.swapchain);
+                                leftMotionInfo = SwapchainTracker::get_instance().get_info(mvInfo->motionVectorSubImage.swapchain);
                             }
 #endif
                             next = next->next;

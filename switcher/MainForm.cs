@@ -12,6 +12,7 @@ namespace MonoEyeSwitcher
         private ComboBox leftEyeComboBox;
         private CheckBox indicatorCheckbox;
         private CheckBox tensorCheckbox;
+        private CheckBox frameGenCheckbox;
         private CheckBox specularCheckbox;
         private CheckBox edgeCheckbox;
         private GroupBox simRacingGroupBox;
@@ -42,7 +43,7 @@ namespace MonoEyeSwitcher
 
         private void InitializeComponent()
         {
-            this.Text = "MonoEye Switcher v0.5.19 (Alpha)";
+            this.Text = "MonoEye Switcher v0.5.20 (Alpha)";
             this.Size = new Size(420, 560);
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
@@ -192,7 +193,7 @@ namespace MonoEyeSwitcher
                 Text = "v3 Advanced Clarity (Experimental)",
                 ForeColor = Color.FromArgb(0, 150, 220),
                 Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-                Size = new Size(360, 130),
+                Size = new Size(360, 160),
                 Location = new Point(20, 370)
             };
             this.Controls.Add(v3Group);
@@ -208,12 +209,23 @@ namespace MonoEyeSwitcher
             };
             v3Group.Controls.Add(tensorCheckbox);
 
+            frameGenCheckbox = new CheckBox
+            {
+                Text = "Temporal Frame Generation (Experimental)",
+                ForeColor = Color.FromArgb(0, 255, 200),
+                Font = new Font("Segoe UI", 8.5F),
+                Location = new Point(15, 55),
+                AutoSize = true,
+                Checked = false
+            };
+            v3Group.Controls.Add(frameGenCheckbox);
+
             specularCheckbox = new CheckBox
             {
                 Text = "Specular De-Shimmer (Input Cleaning)",
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 8.5F),
-                Location = new Point(15, 55),
+                Location = new Point(15, 85),
                 AutoSize = true,
                 Checked = true
             };
@@ -224,7 +236,7 @@ namespace MonoEyeSwitcher
                 Text = "Glass-Edge Smoothing (Depth-Masked AA)",
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 8.5F),
-                Location = new Point(15, 85),
+                Location = new Point(15, 115),
                 AutoSize = true,
                 Checked = true
             };
@@ -523,6 +535,7 @@ namespace MonoEyeSwitcher
             Environment.SetEnvironmentVariable("MONOEYE_LEFT_EYE", leftEyeMode, EnvironmentVariableTarget.Machine);
             Environment.SetEnvironmentVariable("MONOEYE_INDICATOR", indicatorMode, EnvironmentVariableTarget.Machine);
             Environment.SetEnvironmentVariable("MONOEYE_TENSOR_STABILIZATION", tensorCheckbox.Checked ? "1" : "0", EnvironmentVariableTarget.Machine);
+            Environment.SetEnvironmentVariable("MONOEYE_FRAME_GEN", frameGenCheckbox.Checked ? "1" : "0", EnvironmentVariableTarget.Machine);
             Environment.SetEnvironmentVariable("MONOEYE_SPECULAR_REJECTION", specularCheckbox.Checked ? "1" : "0", EnvironmentVariableTarget.Machine);
             Environment.SetEnvironmentVariable("MONOEYE_EDGE_SMOOTHING", edgeCheckbox.Checked ? "1" : "0", EnvironmentVariableTarget.Machine);
             Environment.SetEnvironmentVariable("MONOEYE_LOG_ENABLED", loggingCheckbox.Checked ? "1" : "0", EnvironmentVariableTarget.Machine);
