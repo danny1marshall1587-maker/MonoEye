@@ -88,6 +88,9 @@ def generate_dispatch_header(commands, output_path):
     #ifndef NOMINMAX
     #define NOMINMAX
     #endif
+    #ifndef WIN32_LEAN_AND_MEAN
+    #define WIN32_LEAN_AND_MEAN
+    #endif
     #include <windows.h>
     #include <unknwn.h>
     #include <d3d11.h>
@@ -102,11 +105,15 @@ def generate_dispatch_header(commands, output_path):
     #ifndef XR_USE_GRAPHICS_API_D3D12
     #define XR_USE_GRAPHICS_API_D3D12
     #endif
-    #include <openxr/openxr_platform.h>
+#endif
+
+#ifndef XR_USE_GRAPHICS_API_VULKAN
+#define XR_USE_GRAPHICS_API_VULKAN
 #endif
 
 #include <vulkan/vulkan.h>
 #include <openxr/openxr.h>
+#include <openxr/openxr_platform.h>
 
 namespace monoeye {
 

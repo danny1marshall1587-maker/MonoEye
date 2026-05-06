@@ -48,6 +48,7 @@
 
 // OpenXR includes
 #include <openxr/openxr.h>
+#include <openxr/openxr_platform.h>
 #include <openxr/openxr_loader_negotiation.h>
 
 // Layer negotiation entry point (must be C-exported)
