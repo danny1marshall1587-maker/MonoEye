@@ -49,10 +49,10 @@ if exist "XR_APILAYER_NOVENDOR_monoeye.dll" (
     echo   WARNING: XR_APILAYER_NOVENDOR_monoeye.dll not found in current directory
 )
 
-:: Copy JSON manifest
+:: Copy JSON manifest and fix path to be absolute
 if exist "XR_APILAYER_NOVENDOR_monoeye.json" (
-    copy /Y "XR_APILAYER_NOVENDOR_monoeye.json" "%INSTALL_DIR%\"
-    echo   - Manifest installed
+    powershell -Command "(Get-Content 'XR_APILAYER_NOVENDOR_monoeye.json') -replace '\.\\\XR_APILAYER_NOVENDOR_monoeye.dll', ('%INSTALL_DIR:\=\\%' + '\\\\XR_APILAYER_NOVENDOR_monoeye.dll') | Set-Content '%INSTALL_DIR%\XR_APILAYER_NOVENDOR_monoeye.json'"
+    echo   - Manifest installed (with absolute path)
 ) else (
     echo   WARNING: XR_APILAYER_NOVENDOR_monoeye.json not found in current directory
 )
