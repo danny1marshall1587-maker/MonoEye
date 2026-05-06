@@ -49,7 +49,8 @@ static void ensure_initialized() {
     }
 
     const char* enabled_str = getenv("MONOEYE_LOG_ENABLED");
-    bool logging_enabled = enabled_str && (enabled_str[0] == '1' || enabled_str[0] == 't' || enabled_str[0] == 'T');
+    // Default to ENABLED for debugging if not explicitly disabled
+    bool logging_enabled = !enabled_str || (enabled_str[0] != '0' && enabled_str[0] != 'f' && enabled_str[0] != 'F');
 
     if (logging_enabled) {
         char log_path[512];
@@ -77,6 +78,12 @@ static void ensure_initialized() {
             if (s_log_file) {
                 fprintf(s_log_file, "=== MonoEye Debug Log ===\n");
                 fprintf(s_log_file, "Build Date: %s %s\n", __DATE__, __TIME__);
+                
+#ifdef _WIN32
+                char dll_path[MAX_PATH];
+                GetModuleFileNameA(GetModuleHandleA("XR_APILAYER_NOVENDOR_monoeye.dll"), dll_path, MAX_PATH);
+                fprintf(s_log_file, "DLL Path: %s\n", dll_path);
+#endif
                 fprintf(s_log_file, "=========================\n\n");
             }
         }

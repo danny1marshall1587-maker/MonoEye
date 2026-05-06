@@ -42,7 +42,7 @@ namespace MonoEyeSwitcher
 
         private void InitializeComponent()
         {
-            this.Text = "MonoEye Switcher v0.5.17 (Alpha)";
+            this.Text = "MonoEye Switcher v0.5.18 (Alpha)";
             this.Size = new Size(420, 560);
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
@@ -474,6 +474,9 @@ namespace MonoEyeSwitcher
             {
                 if (!isEnabled)
                 {
+                    // Apply all settings immediately on enable
+                    ApplyCurrentSettings();
+                    
                     Environment.SetEnvironmentVariable("MONOEYE_ENABLE", "1", EnvironmentVariableTarget.Machine);
                     Environment.SetEnvironmentVariable("MONOEYE_DISABLE", null, EnvironmentVariableTarget.Machine);
                     RegisterOpenXRLayer(true);
@@ -486,7 +489,7 @@ namespace MonoEyeSwitcher
 
                 UpdateStatus();
                 MessageBox.Show(
-                    isEnabled ? "MonoEye is now enabled.\n\nRestart any running VR applications for changes to take effect." : "MonoEye is now disabled.",
+                    isEnabled ? "MonoEye is now enabled.\n\nRestart any running VR applications (and Steam) for changes to take effect." : "MonoEye is now disabled.",
                     "MonoEye Switcher",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information
@@ -501,6 +504,28 @@ namespace MonoEyeSwitcher
                     MessageBoxIcon.Error
                 );
             }
+        }
+
+        private void ApplyCurrentSettings()
+        {
+            string qualityMode = qualityComboBox.SelectedIndex switch
+            {
+                0 => "fast",
+                1 => "balanced",
+                2 => "quality",
+                _ => "balanced"
+            };
+
+            string leftEyeMode = leftEyeComboBox.SelectedIndex == 0 ? "left" : "right";
+            string indicatorMode = indicatorCheckbox.Checked ? "1" : "0";
+
+            Environment.SetEnvironmentVariable("MONOEYE_QUALITY", qualityMode, EnvironmentVariableTarget.Machine);
+            Environment.SetEnvironmentVariable("MONOEYE_LEFT_EYE", leftEyeMode, EnvironmentVariableTarget.Machine);
+            Environment.SetEnvironmentVariable("MONOEYE_INDICATOR", indicatorMode, EnvironmentVariableTarget.Machine);
+            Environment.SetEnvironmentVariable("MONOEYE_TENSOR_STABILIZATION", tensorCheckbox.Checked ? "1" : "0", EnvironmentVariableTarget.Machine);
+            Environment.SetEnvironmentVariable("MONOEYE_SPECULAR_REJECTION", specularCheckbox.Checked ? "1" : "0", EnvironmentVariableTarget.Machine);
+            Environment.SetEnvironmentVariable("MONOEYE_EDGE_SMOOTHING", edgeCheckbox.Checked ? "1" : "0", EnvironmentVariableTarget.Machine);
+            Environment.SetEnvironmentVariable("MONOEYE_LOG_ENABLED", loggingCheckbox.Checked ? "1" : "0", EnvironmentVariableTarget.Machine);
         }
 
         private void RegisterOpenXRLayer(bool enable)
@@ -579,24 +604,8 @@ namespace MonoEyeSwitcher
         {
             try
             {
-                string qualityMode = qualityComboBox.SelectedIndex switch
-                {
-                    0 => "fast",
-                    1 => "balanced",
-                    2 => "quality",
-                    _ => "balanced"
-                };
+                ApplyCurrentSettings();
 
-                string leftEyeMode = leftEyeComboBox.SelectedIndex == 0 ? "left" : "right";
-                string indicatorMode = indicatorCheckbox.Checked ? "1" : "0";
-
-                Environment.SetEnvironmentVariable("MONOEYE_QUALITY", qualityMode, EnvironmentVariableTarget.Machine);
-                Environment.SetEnvironmentVariable("MONOEYE_LEFT_EYE", leftEyeMode, EnvironmentVariableTarget.Machine);
-                Environment.SetEnvironmentVariable("MONOEYE_INDICATOR", indicatorMode, EnvironmentVariableTarget.Machine);
-                Environment.SetEnvironmentVariable("MONOEYE_TENSOR_STABILIZATION", tensorCheckbox.Checked ? "1" : "0", EnvironmentVariableTarget.Machine);
-                Environment.SetEnvironmentVariable("MONOEYE_SPECULAR_REJECTION", specularCheckbox.Checked ? "1" : "0", EnvironmentVariableTarget.Machine);
-                Environment.SetEnvironmentVariable("MONOEYE_EDGE_SMOOTHING", edgeCheckbox.Checked ? "1" : "0", EnvironmentVariableTarget.Machine);
-                Environment.SetEnvironmentVariable("MONOEYE_LOG_ENABLED", loggingCheckbox.Checked ? "1" : "0", EnvironmentVariableTarget.Machine);
                 if (loggingCheckbox.Checked)
                 {
                     Environment.SetEnvironmentVariable("MONOEYE_LOG_LEVEL", "debug", EnvironmentVariableTarget.Machine);
