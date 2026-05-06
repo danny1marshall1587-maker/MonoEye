@@ -67,6 +67,8 @@ jobs:
           Copy-Item install\windows\install.bat release\
           Copy-Item install\windows\uninstall.bat release\
           Copy-Item install\windows\clean_layers.bat release\
+          Copy-Item install\windows\monoeye_live_debugger.bat release\
+          Copy-Item monoeye_*.bat release\
           Compress-Archive -Path release\* -DestinationPath MonoEye-windows-x64.zip
 
       - name: Upload Windows Artifact
