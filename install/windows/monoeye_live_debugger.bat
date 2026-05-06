@@ -1,25 +1,37 @@
 @echo off
 setlocal EnableDelayedExpansion
 
-:: MonoEye Live Debugger & Diagnostic Tool v1.1
+:: MonoEye Live Debugger & Diagnostic Tool v1.2
 :: This tool helps identify why MonoEye might fail to load in specific games.
 
 title MonoEye Live Debugger
 
 :: --- Configuration ---
-set "MANIFEST_DIR=%~dp0manifest"
-set "LAYER_DIR=%~dp0"
+:: We assume this script is in 'install/windows/' or root.
+:: If in 'install/windows/', manifest is at '../../manifest/'
+:: If in root, manifest is at 'manifest/'
+set "SCRIPT_DIR=%~dp0"
+if exist "%SCRIPT_DIR%manifest\XR_APILAYER_NOVENDOR_monoeye.json" (
+    set "MANIFEST_PATH=%SCRIPT_DIR%manifest\XR_APILAYER_NOVENDOR_monoeye.json"
+    set "LAYER_DIR=%SCRIPT_DIR%"
+) else if exist "%SCRIPT_DIR%..\..\manifest\XR_APILAYER_NOVENDOR_monoeye.json" (
+    set "MANIFEST_PATH=%SCRIPT_DIR%..\..\manifest\XR_APILAYER_NOVENDOR_monoeye.json"
+    set "LAYER_DIR=%SCRIPT_DIR%..\..\"
+) else (
+    set "MANIFEST_PATH=NOT_FOUND"
+)
+
 set "LOG_FILE=%USERPROFILE%\Documents\MonoEye\monoeye.log"
 
 :main_menu
 cls
 echo ======================================================================
-echo   MONOEYE LIVE DEBUGGER ^& DIAGNOSTIC TOOL
+echo   MONOEYE LIVE DEBUGGER ^& DIAGNOSTIC TOOL v1.2
 echo ======================================================================
 echo.
 echo  [1] System Check (Verify Registry, Manifest, and DLL)
 echo  [2] Start Live Logger (Tail monoeye.log)
-echo  [3] Launch Game with Full Debug (AC Evo / Steam / Generic)
+echo  [3] FORCE LAUNCH Game (Auto-VR, Path Injection, Debug)
 echo  [4] Clean Registry (Remove broken OpenXR layers)
 echo  [5] Exit
 echo.
@@ -38,18 +50,17 @@ echo [DIAGNOSTIC] Checking System State...
 echo.
 
 :: Check for DLL
-if exist "%~dp0XR_APILAYER_NOVENDOR_monoeye.dll" (
+if exist "%LAYER_DIR%XR_APILAYER_NOVENDOR_monoeye.dll" (
     echo [OK] Layer DLL found: XR_APILAYER_NOVENDOR_monoeye.dll
 ) else (
-    echo [!] ERROR: Layer DLL not found in script directory!
+    echo [!] ERROR: Layer DLL not found in expected directory: "%LAYER_DIR%"
 )
 
 :: Check Manifest
-set "MANIFEST_PATH=%~dp0manifest\XR_APILAYER_NOVENDOR_monoeye.json"
 if exist "%MANIFEST_PATH%" (
     echo [OK] Manifest found: %MANIFEST_PATH%
 ) else (
-    echo [!] ERROR: Manifest not found!
+    echo [!] ERROR: Manifest not found! Checked: "%MANIFEST_PATH%"
 )
 
 :: Check Registry
@@ -61,9 +72,9 @@ if %errorlevel% equ 0 (
     reg query "HKCU\SOFTWARE\Khronos\OpenXR\1\ApiLayers\Implicit" /v "XR_APILAYER_NOVENDOR_monoeye" >nul 2>&1
     if %errorlevel% equ 0 (
         echo [OK] MonoEye found in HKCU Registry.
-    else (
+    ) else (
         echo [!] WARNING: MonoEye is NOT registered as an implicit layer.
-        echo      Use the install.bat or Switcher to register it.
+        echo      This is fine if using the "FORCE LAUNCH" option.
     )
 )
 
@@ -91,20 +102,31 @@ goto main_menu
 
 :launch_game
 cls
-echo [LAUNCHER] Forcing Debug Mode...
+echo [FORCE LAUNCHER] Preparing Session...
 echo.
-set MONOEYE_LOG_ENABLED=1
-set MONOEYE_LOG_LEVEL=debug
-set MONOEYE_ENABLE=1
-set XR_LOADER_DEBUG=all
 
-echo [DEBUG SET] MONOEYE_LOG_LEVEL=debug
-echo [DEBUG SET] XR_LOADER_DEBUG=all (Verbose OpenXR Loader logs)
+:: 1. Setup Layer Path Injection (Forces loader to see us)
+if exist "%MANIFEST_PATH%" (
+    set "XR_API_LAYER_PATH=%MANIFEST_PATH%"
+    echo [+] FORCING Layer Path: !XR_API_LAYER_PATH!
+) else (
+    echo [!] ERROR: Cannot force launch - Manifest not found!
+    pause
+    goto main_menu
+)
+
+:: 2. Setup Verbose Debugging
+set "MONOEYE_LOG_ENABLED=1"
+set "MONOEYE_LOG_LEVEL=debug"
+set "MONOEYE_ENABLE=1"
+set "XR_LOADER_DEBUG=all"
+
+echo [+] FORCING MONOEYE_LOG_LEVEL=debug
+echo [+] FORCING XR_LOADER_DEBUG=all
 echo.
-echo NOTE: Loader logs (XR_LOADER_DEBUG) will appear in the game's output.
-echo MonoEye internal logs will go to %LOG_FILE%.
-echo.
-echo Please DRAG AND DROP your Game EXE into this window and press ENTER:
+
+:: 3. Application Path
+echo Please DRAG AND DROP your Game EXE (e.g. acevo.exe) into this window:
 set /p GAME_PATH="> "
 set "GAME_PATH=%GAME_PATH:"=%"
 
@@ -114,20 +136,50 @@ if not exist "%GAME_PATH%" (
     goto main_menu
 )
 
+:: 4. Force VR Arguments
 echo.
-echo [+] Launching Game...
-start "" "%GAME_PATH%"
+echo Choose Launch Mode:
+echo  [1] Standard VR (adds -vr)
+echo  [2] OpenXR Mode (adds -openxr)
+echo  [3] Custom / No extra args
+echo.
+set /p mode="Mode: "
+
+set "ARGS="
+if "%mode%"=="1" set "ARGS=-vr"
+if "%mode%"=="2" set "ARGS=-openxr"
 
 echo.
-echo [+] Game launched. Switching to live log monitor in 3 seconds...
-timeout /t 3 > nul
-goto live_logger
+echo [+] Launching: "%GAME_PATH%" %ARGS%
+echo.
+echo ----------------------------------------------------------------------
+echo   NOTE: Look at THIS WINDOW for OpenXR Loader logs.
+echo   Internal MonoEye logs will go to Documents\MonoEye\monoeye.log
+echo ----------------------------------------------------------------------
+echo.
+
+:: Launch the game. We use /B to keep the terminal attached to stderr/stdout
+start /B "" "%GAME_PATH%" %ARGS%
+
+echo.
+echo [+] Game process started. 
+echo [+] Starting log monitor in 5 seconds...
+timeout /t 5 > nul
+
+:: Switch to live logger but in the same window (don't cls)
+echo ----------------------------------------------------------------------
+echo   LIVE MONOEYE LOG START
+echo ----------------------------------------------------------------------
+powershell.exe -ExecutionPolicy Bypass -Command "if (Test-Path '$env:LOG_FILE') { Get-Content -Path '$env:LOG_FILE' -Wait -Tail 20 } else { Write-Host 'Waiting for log file...'; while (!(Test-Path '$env:LOG_FILE')) { Start-Sleep -Seconds 1 }; Get-Content -Path '$env:LOG_FILE' -Wait -Tail 20 }"
+
+pause
+goto main_menu
 
 :clean_registry
 cls
 echo [CLEAN] Removing potential stale MonoEye entries...
 reg delete "HKCU\SOFTWARE\Khronos\OpenXR\1\ApiLayers\Implicit" /v "XR_APILAYER_NOVENDOR_monoeye" /f >nul 2>&1
 reg delete "HKLM\SOFTWARE\Khronos\OpenXR\1\ApiLayers\Implicit" /v "XR_APILAYER_NOVENDOR_monoeye" /f >nul 2>&1
-echo [OK] Cleaned. Please re-run install.bat or use Switcher to re-enable.
+echo [OK] Cleaned.
 pause
 goto main_menu
