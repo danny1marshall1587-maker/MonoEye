@@ -13,9 +13,21 @@
 
 namespace monoeye {
 
-// Track which instance owns each session
-std::mutex s_session_map_mutex;
-std::unordered_map<XrSession, XrInstance> s_session_map;
+enum SessionType {
+    SESSION_VULKAN,
+    SESSION_D3D11,
+    SESSION_D3D12,
+    SESSION_UNKNOWN
+};
+
+struct SessionState {
+    XrInstance instance;
+    SessionType type;
+};
+
+// Track which instance owns each session and its graphics API
+extern std::mutex s_session_map_mutex;
+extern std::unordered_map<XrSession, SessionState> s_session_map;
 
 extern "C" XrResult monoeye_xrCreateSwapchain(
     XrSession session,
@@ -28,11 +40,13 @@ extern "C" XrResult monoeye_xrCreateSwapchain(
         createInfo->usageFlags);
 
     XrInstance instance = XR_NULL_HANDLE;
+    SessionType sessionType = SESSION_UNKNOWN;
     {
         std::lock_guard<std::mutex> lock(s_session_map_mutex);
         auto it = s_session_map.find(session);
         if (it != s_session_map.end()) {
-            instance = it->second;
+            instance = it->second.instance;
+            sessionType = it->second.type;
         }
     }
 
@@ -62,31 +76,42 @@ extern "C" XrResult monoeye_xrCreateSwapchain(
 
 
         if (imageCount > 0) {
-            // Allocate Vulkan image array
-#ifdef _WIN32
-            std::vector<XrSwapchainImageVulkanKHR> vkImages(imageCount);
-#else
-            std::vector<XrSwapchainImageVulkanKHR> vkImages(imageCount);
-#endif
-            for (uint32_t i = 0; i < imageCount; ++i) {
-                vkImages[i].type = XR_TYPE_SWAPCHAIN_IMAGE_VULKAN_KHR;
-                vkImages[i].next = nullptr;
-                vkImages[i].image = VK_NULL_HANDLE;
+            std::vector<char> buffer;
+            XrStructureType imageType = XR_TYPE_UNKNOWN;
+            size_t structSize = 0;
+
+            if (sessionType == SESSION_VULKAN) {
+                imageType = XR_TYPE_SWAPCHAIN_IMAGE_VULKAN_KHR;
+                structSize = sizeof(XrSwapchainImageVulkanKHR);
+            } else if (sessionType == SESSION_D3D11) {
+                imageType = XR_TYPE_SWAPCHAIN_IMAGE_D3D11_KHR;
+                structSize = sizeof(XrSwapchainImageD3D11KHR);
+            } else if (sessionType == SESSION_D3D12) {
+                imageType = XR_TYPE_SWAPCHAIN_IMAGE_D3D12_KHR;
+                structSize = sizeof(XrSwapchainImageD3D12KHR);
             }
 
-            uint32_t actualCount = 0;
-            ((PFN_xrEnumerateSwapchainImages)dispatch->xrEnumerateSwapchainImages)(
-                *swapchain,
-                imageCount,
-                &actualCount,
-                reinterpret_cast<XrSwapchainImageBaseHeader*>(vkImages.data())
-            );
+            if (structSize > 0) {
+                buffer.resize(imageCount * structSize);
+                for (uint32_t i = 0; i < imageCount; ++i) {
+                    XrSwapchainImageBaseHeader* header = reinterpret_cast<XrSwapchainImageBaseHeader*>(buffer.data() + (i * structSize));
+                    header->type = imageType;
+                    header->next = nullptr;
+                }
 
+                uint32_t actualCount = 0;
+                ((PFN_xrEnumerateSwapchainImages)dispatch->xrEnumerateSwapchainImages)(
+                    *swapchain,
+                    imageCount,
+                    &actualCount,
+                    reinterpret_cast<XrSwapchainImageBaseHeader*>(buffer.data())
+                );
 
-            SwapchainTracker::get_instance().track_swapchain(
-                *swapchain, *createInfo, actualCount,
-                reinterpret_cast<XrSwapchainImageBaseHeader*>(vkImages.data())
-            );
+                SwapchainTracker::get_instance().track_swapchain(
+                    *swapchain, *createInfo, actualCount,
+                    reinterpret_cast<XrSwapchainImageBaseHeader*>(buffer.data())
+                );
+            }
         }
     }
 

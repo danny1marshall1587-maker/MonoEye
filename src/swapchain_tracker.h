@@ -32,6 +32,11 @@ struct SwapchainImageInfo {
     std::vector<VkImage> vulkanImages;
     std::vector<VkImageView> vulkanImageViews;
 
+    // For DirectX 11/12
+    bool isD3D11;
+    bool isD3D12;
+    std::vector<void*> d3dResources;
+
     // Tracking which eye this swapchain belongs to
     bool isDepth;
     bool isLeftEye;

@@ -16,8 +16,21 @@
 
 namespace monoeye {
 
+enum SessionType {
+    SESSION_VULKAN,
+    SESSION_D3D11,
+    SESSION_D3D12,
+    SESSION_UNKNOWN
+};
+
+struct SessionState {
+    XrInstance instance;
+    SessionType type;
+};
+
+// Track which instance owns each session and its graphics API
 extern std::mutex s_session_map_mutex;
-extern std::unordered_map<XrSession, XrInstance> s_session_map;
+extern std::unordered_map<XrSession, SessionState> s_session_map;
 
 extern "C" XrResult
 monoeye_xrCreateSession(XrInstance instance,
@@ -50,10 +63,32 @@ monoeye_xrCreateSession(XrInstance instance,
 
   MONOEYE_LOG("Session created: %p", (void *)(uintptr_t)*session);
 
-  // Map session to instance for later lookups
+  // Map session to instance and detect type
   {
     std::lock_guard<std::mutex> lock(s_session_map_mutex);
-    s_session_map[*session] = instance;
+    SessionState state = {instance, SESSION_UNKNOWN};
+    
+    if (createInfo && createInfo->next) {
+      const XrBaseInStructure *header =
+          reinterpret_cast<const XrBaseInStructure *>(createInfo->next);
+      while (header) {
+        if (header->type == XR_TYPE_GRAPHICS_BINDING_VULKAN2_KHR ||
+            header->type == XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR) {
+          state.type = SESSION_VULKAN;
+          break;
+        } else if (header->type == XR_TYPE_GRAPHICS_BINDING_D3D11_KHR) {
+          state.type = SESSION_D3D11;
+          MONOEYE_LOG("DirectX 11 session detected");
+          break;
+        } else if (header->type == XR_TYPE_GRAPHICS_BINDING_D3D12_KHR) {
+          state.type = SESSION_D3D12;
+          MONOEYE_LOG("DirectX 12 session detected");
+          break;
+        }
+        header = header->next;
+      }
+    }
+    s_session_map[*session] = state;
   }
 
   // Initialize the Vulkan warp pipeline if enabled
@@ -119,7 +154,7 @@ extern "C" XrResult monoeye_xrDestroySession(XrSession session) {
     std::lock_guard<std::mutex> lock(s_session_map_mutex);
     auto it = s_session_map.find(session);
     if (it != s_session_map.end()) {
-      instance = it->second;
+      instance = it->second.instance;
       s_session_map.erase(it);
     }
   }

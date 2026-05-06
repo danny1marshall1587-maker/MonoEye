@@ -30,34 +30,46 @@ void SwapchainTracker::track_swapchain(
     info.isLeftEye = false;
     info.isRightEye = false;
 
-    // Extract Vulkan image handles if this is a Vulkan swapchain
+    // Extract image handles based on API type
     info.isVulkan = false;
-    if (createInfo.usageFlags & XR_SWAPCHAIN_USAGE_SAMPLED_BIT) {
+    info.isD3D11 = false;
+    info.isD3D12 = false;
+
+    if (images && images->type == XR_TYPE_SWAPCHAIN_IMAGE_VULKAN_KHR) {
+        info.isVulkan = true;
         const XrSwapchainImageVulkanKHR* vkImages =
             reinterpret_cast<const XrSwapchainImageVulkanKHR*>(images);
-        if (images && images->type == XR_TYPE_SWAPCHAIN_IMAGE_VULKAN_KHR) {
-            info.isVulkan = true;
-            VkDevice device = WarpPipeline::get_instance().get_vk_device();
-            for (uint32_t i = 0; i < imageCount; ++i) {
-                info.vulkanImages.push_back(vkImages[i].image);
+        VkDevice device = WarpPipeline::get_instance().get_vk_device();
+        for (uint32_t i = 0; i < imageCount; ++i) {
+            info.vulkanImages.push_back(vkImages[i].image);
+            
+            if (device != VK_NULL_HANDLE) {
+                VkImageViewCreateInfo viewInfo = {VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+                viewInfo.image = vkImages[i].image;
+                viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+                viewInfo.format = static_cast<VkFormat>(createInfo.format);
+                viewInfo.subresourceRange.aspectMask = (createInfo.usageFlags & XR_SWAPCHAIN_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+                viewInfo.subresourceRange.levelCount = 1;
+                viewInfo.subresourceRange.layerCount = 1;
                 
-                if (device != VK_NULL_HANDLE) {
-                    VkImageViewCreateInfo viewInfo = {VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
-                    viewInfo.image = vkImages[i].image;
-                    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-                    viewInfo.format = static_cast<VkFormat>(createInfo.format);
-                    viewInfo.subresourceRange.aspectMask = (createInfo.usageFlags & XR_SWAPCHAIN_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
-                    viewInfo.subresourceRange.levelCount = 1;
-                    viewInfo.subresourceRange.layerCount = 1;
-                    
-                    VkImageView view;
-                    if (vkCreateImageView(device, &viewInfo, nullptr, &view) == VK_SUCCESS) {
-                        info.vulkanImageViews.push_back(view);
-                    }
+                VkImageView view;
+                if (vkCreateImageView(device, &viewInfo, nullptr, &view) == VK_SUCCESS) {
+                    info.vulkanImageViews.push_back(view);
                 }
             }
         }
-
+    } else if (images && images->type == XR_TYPE_SWAPCHAIN_IMAGE_D3D11_KHR) {
+        info.isD3D11 = true;
+        const XrSwapchainImageD3D11KHR* d3dImages = reinterpret_cast<const XrSwapchainImageD3D11KHR*>(images);
+        for (uint32_t i = 0; i < imageCount; ++i) {
+            info.d3dResources.push_back(d3dImages[i].texture);
+        }
+    } else if (images && images->type == XR_TYPE_SWAPCHAIN_IMAGE_D3D12_KHR) {
+        info.isD3D12 = true;
+        const XrSwapchainImageD3D12KHR* d3dImages = reinterpret_cast<const XrSwapchainImageD3D12KHR*>(images);
+        for (uint32_t i = 0; i < imageCount; ++i) {
+            info.d3dResources.push_back(d3dImages[i].texture);
+        }
     }
 
     // Check if this is a depth swapchain based on usage flags
@@ -68,13 +80,13 @@ void SwapchainTracker::track_swapchain(
     m_swapchains[swapchain] = info;
     m_assigned_eye[swapchain] = false;
 
-    MONOEYE_LOG_DEBUG("Tracked swapchain %p: %dx%d, fmt=%d, samples=%d, depth=%s, vulkan=%s",
+    MONOEYE_LOG_DEBUG("Tracked swapchain %p: %dx%d, fmt=%d, samples=%d, depth=%s, api=%s",
         (void*)(uintptr_t)swapchain,
         createInfo.width, createInfo.height,
         createInfo.format,
         createInfo.sampleCount,
         info.isDepth ? "yes" : "no",
-        info.isVulkan ? "yes" : "no");
+        info.isVulkan ? "Vulkan" : (info.isD3D11 ? "D3D11" : (info.isD3D12 ? "D3D12" : "Unknown")));
 }
 
 void SwapchainTracker::untrack_swapchain(XrSwapchain swapchain) {

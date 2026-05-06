@@ -33,7 +33,7 @@ extern "C" XrResult monoeye_xrBeginFrame(
         std::lock_guard<std::mutex> lock(s_session_map_mutex);
         auto it = s_session_map.find(session);
         if (it != s_session_map.end()) {
-            instance = it->second;
+            instance = it->second.instance;
         }
     }
 
@@ -76,7 +76,7 @@ extern "C" XrResult monoeye_xrEndFrame(
         std::lock_guard<std::mutex> lock(s_session_map_mutex);
         auto it = s_session_map.find(session);
         if (it != s_session_map.end()) {
-            instance = it->second;
+            instance = it->second.instance;
         }
     }
 

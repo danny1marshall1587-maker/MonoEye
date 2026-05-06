@@ -130,6 +130,40 @@ extern "C" XrResult monoeye_xrGetVulkanGraphicsDevice2KHR(
 
 }
 
+extern "C" XrResult monoeye_xrGetD3D11GraphicsRequirementsKHR(
+    XrInstance instance,
+    XrSystemId systemId,
+    XrGraphicsRequirementsD3D11KHR* graphicsRequirements
+) {
+    monoeye::XrGeneratedDispatchTable* dispatch = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(monoeye::g_instance_dispatch_mutex);
+        auto it = monoeye::g_instance_dispatch_map.find(instance);
+        if (it != monoeye::g_instance_dispatch_map.end()) {
+            dispatch = it->second;
+        }
+    }
+    if (!dispatch || !dispatch->xrGetD3D11GraphicsRequirementsKHR) return XR_ERROR_RUNTIME_FAILURE;
+    return ((PFN_xrGetD3D11GraphicsRequirementsKHR)dispatch->xrGetD3D11GraphicsRequirementsKHR)(instance, systemId, graphicsRequirements);
+}
+
+extern "C" XrResult monoeye_xrGetD3D12GraphicsRequirementsKHR(
+    XrInstance instance,
+    XrSystemId systemId,
+    XrGraphicsRequirementsD3D12KHR* graphicsRequirements
+) {
+    monoeye::XrGeneratedDispatchTable* dispatch = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(monoeye::g_instance_dispatch_mutex);
+        auto it = monoeye::g_instance_dispatch_map.find(instance);
+        if (it != monoeye::g_instance_dispatch_map.end()) {
+            dispatch = it->second;
+        }
+    }
+    if (!dispatch || !dispatch->xrGetD3D12GraphicsRequirementsKHR) return XR_ERROR_RUNTIME_FAILURE;
+    return ((PFN_xrGetD3D12GraphicsRequirementsKHR)dispatch->xrGetD3D12GraphicsRequirementsKHR)(instance, systemId, graphicsRequirements);
+}
+
 namespace monoeye {
 
 struct HookedFunction {
@@ -150,9 +184,12 @@ static const HookedFunction s_hooked_functions[] = {
     {"xrWaitSwapchainImage",    (PFN_xrVoidFunction)monoeye_xrWaitSwapchainImage},
     {"xrReleaseSwapchainImage", (PFN_xrVoidFunction)monoeye_xrReleaseSwapchainImage},
     {"xrGetVulkanGraphicsRequirements2KHR", (PFN_xrVoidFunction)monoeye_xrGetVulkanGraphicsRequirements2KHR},
+    {"xrGetVulkanGraphicsRequirementsKHR",  (PFN_xrVoidFunction)monoeye_xrGetVulkanGraphicsRequirements2KHR},
     {"xrGetVulkanGraphicsDevice2KHR",       (PFN_xrVoidFunction)monoeye_xrGetVulkanGraphicsDevice2KHR},
-    // v1 KHR variants: pass straight through — they have different signatures
-    // and are handled by the g_nextGetInstanceProcAddr fallback below
+    {"xrGetVulkanGraphicsDeviceKHR",        (PFN_xrVoidFunction)monoeye_xrGetVulkanGraphicsDevice2KHR},
+    
+    {"xrGetD3D11GraphicsRequirementsKHR",   (PFN_xrVoidFunction)monoeye_xrGetD3D11GraphicsRequirementsKHR},
+    {"xrGetD3D12GraphicsRequirementsKHR",   (PFN_xrVoidFunction)monoeye_xrGetD3D12GraphicsRequirementsKHR},
 
     {"xrEnumerateViewConfigurationViews",   (PFN_xrVoidFunction)monoeye_xrEnumerateViewConfigurationViews},
     {"xrLocateViews",                       (PFN_xrVoidFunction)monoeye_xrLocateViews},
