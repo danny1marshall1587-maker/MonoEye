@@ -11,6 +11,9 @@
 namespace monoeye {
 // Global next GetInstanceProcAddr for NULL-instance calls
 PFN_xrGetInstanceProcAddr g_nextGetInstanceProcAddr = nullptr;
+
+void start_heartbeat();
+void stop_heartbeat();
 }
 
 #ifdef _WIN32
@@ -22,8 +25,10 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
             DisableThreadLibraryCalls(hinstDLL);
             // Early log to confirm the DLL is loaded in the process
             MONOEYE_LOG("--- MonoEye DLL Attached to Process ---");
+            monoeye::start_heartbeat();
             break;
         case DLL_PROCESS_DETACH:
+            monoeye::stop_heartbeat();
             MONOEYE_LOG("--- MonoEye DLL Detached from Process ---");
             break;
     }
@@ -34,6 +39,10 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
 // The core negotiation function - this is the only function the loader calls
 // directly from our DLL via GetProcAddress. Everything else goes through
 // xrGetInstanceProcAddr.
+#ifdef _WIN32
+#pragma comment(linker, "/EXPORT:xrNegotiateLoaderApiLayerInterface")
+#endif
+
 extern "C" MONOEYE_EXPORT XRAPI_ATTR XrResult XRAPI_CALL xrNegotiateLoaderApiLayerInterface(
     const XrNegotiateLoaderInfo* loaderInfo,
     const char* apiLayerName,

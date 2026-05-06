@@ -22,6 +22,7 @@ extern std::unordered_map<XrSession, SessionState> s_session_map;
 static std::mutex s_frame_mutex;
 static XrFrameState s_last_frame_state = {};
 static bool s_frame_state_valid = false;
+std::atomic<uint64_t> g_frame_count{0};
 
 extern "C" XrResult XRAPI_CALL monoeye_xrBeginFrame(
     XrSession session,
@@ -200,6 +201,7 @@ extern "C" XrResult XRAPI_CALL monoeye_xrEndFrame(
     modifiedFrameEndInfo.layerCount = (uint32_t)modifiedLayers.size();
     modifiedFrameEndInfo.layers = modifiedLayers.data();
 
+    g_frame_count.fetch_add(1, std::memory_order_relaxed);
     return ((PFN_xrEndFrame)dispatch->xrEndFrame)(session, &modifiedFrameEndInfo);
 
 }

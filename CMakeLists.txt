@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.18)
 project(MonoEye
-    VERSION 0.5.45
+    VERSION 0.5.46
 
     DESCRIPTION "MonoEye - Single-eye VR rendering with depth-based second eye reconstruction"
     LANGUAGES CXX
@@ -137,6 +137,7 @@ add_custom_command(
 # Source files
 set(MONOEYE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/layer_negotiation.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/heartbeat.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/layer_instance.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/layer_proc_addr.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/dispatch_table.cpp
