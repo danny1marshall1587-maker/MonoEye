@@ -28,18 +28,20 @@
 #define XR_USE_GRAPHICS_API_VULKAN
 #endif
 
-#ifndef XR_USE_GRAPHICS_API_D3D11
-#define XR_USE_GRAPHICS_API_D3D11
-#endif
-
-#ifndef XR_USE_GRAPHICS_API_D3D12
-#define XR_USE_GRAPHICS_API_D3D12
-#endif
-
 #ifdef _WIN32
-#include <unknwn.h>
-#include <d3d11.h>
-#include <d3d12.h>
+    #ifndef XR_USE_PLATFORM_WIN32
+    #define XR_USE_PLATFORM_WIN32
+    #endif
+    #ifndef XR_USE_GRAPHICS_API_D3D11
+    #define XR_USE_GRAPHICS_API_D3D11
+    #endif
+    #ifndef XR_USE_GRAPHICS_API_D3D12
+    #define XR_USE_GRAPHICS_API_D3D12
+    #endif
+
+    #include <unknwn.h>
+    #include <d3d11.h>
+    #include <d3d12.h>
 #endif
 
 // OpenXR includes

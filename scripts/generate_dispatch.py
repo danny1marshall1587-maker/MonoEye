@@ -93,7 +93,13 @@ def generate_dispatch_header(commands, output_path):
 
 #include <vulkan/vulkan.h>
 #include <openxr/openxr.h>
+
+#ifdef _WIN32
+#define XR_USE_PLATFORM_WIN32
+#define XR_USE_GRAPHICS_API_D3D11
+#define XR_USE_GRAPHICS_API_D3D12
 #include <openxr/openxr_platform.h>
+#endif
 
 namespace monoeye {
 

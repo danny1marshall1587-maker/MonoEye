@@ -72,12 +72,6 @@ void SwapchainTracker::track_swapchain(
         for (uint32_t i = 0; i < imageCount; ++i) {
             info.d3dResources.push_back(d3dImages[i].texture);
         }
-    } else if (images && images->type == XR_TYPE_SWAPCHAIN_IMAGE_D3D12_KHR) {
-        info.isD3D12 = true;
-        const XrSwapchainImageD3D12KHR* d3dImages = reinterpret_cast<const XrSwapchainImageD3D12KHR*>(images);
-        for (uint32_t i = 0; i < imageCount; ++i) {
-            info.d3dResources.push_back(d3dImages[i].texture);
-        }
     }
 #endif
 

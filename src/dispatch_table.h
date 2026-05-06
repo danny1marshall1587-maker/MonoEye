@@ -11,6 +11,23 @@
 #endif
 
 #include <vulkan/vulkan.h>
+
+#ifndef XR_USE_GRAPHICS_API_VULKAN
+#define XR_USE_GRAPHICS_API_VULKAN
+#endif
+
+#ifdef _WIN32
+    #ifndef XR_USE_PLATFORM_WIN32
+    #define XR_USE_PLATFORM_WIN32
+    #endif
+    #ifndef XR_USE_GRAPHICS_API_D3D11
+    #define XR_USE_GRAPHICS_API_D3D11
+    #endif
+    #ifndef XR_USE_GRAPHICS_API_D3D12
+    #define XR_USE_GRAPHICS_API_D3D12
+    #endif
+#endif
+
 #include <openxr/openxr.h>
 
 #include <unordered_map>
