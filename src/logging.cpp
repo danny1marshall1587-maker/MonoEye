@@ -69,7 +69,8 @@ static void ensure_initialized() {
             snprintf(log_path, sizeof(log_path), "%s/Documents/MonoEye", home);
             char mkdir_cmd[512];
             snprintf(mkdir_cmd, sizeof(mkdir_cmd), "mkdir -p %s", log_path);
-            system(mkdir_cmd);
+            int res = system(mkdir_cmd);
+            (void)res;
             strncat(log_path, "/monoeye.log", sizeof(log_path) - strlen(log_path) - 1);
         }
 #endif
