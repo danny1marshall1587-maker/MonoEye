@@ -63,15 +63,18 @@ monoeye_xrCreateSession(XrInstance instance,
         if (header->type == XR_TYPE_GRAPHICS_BINDING_VULKAN2_KHR ||
             header->type == XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR) {
           state.type = SESSION_VULKAN;
+          MONOEYE_LOG("Vulkan session detected");
           break;
         } 
 #ifdef _WIN32
         else if (header->type == XR_TYPE_GRAPHICS_BINDING_D3D11_KHR) {
           state.type = SESSION_D3D11;
-          MONOEYE_LOG("DirectX 11 session detected");
+          MONOEYE_LOG("DirectX 11 session detected (AC Evo / Legacy DX11)");
+          break;
         } else if (header->type == XR_TYPE_GRAPHICS_BINDING_D3D12_KHR) {
           state.type = SESSION_D3D12;
-          MONOEYE_LOG("DirectX 12 session detected");
+          MONOEYE_LOG("DirectX 12 session detected (AC Evo / Modern DX12)");
+          break;
         }
 #endif
         header = header->next;

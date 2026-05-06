@@ -23,10 +23,10 @@ XrResult LayerXrCreateApiLayerInstance(
     }
 
     // Validate the API layer info structure
-    if (apiLayerInfo->structType != XR_LOADER_INTERFACE_STRUCT_API_LAYER_CREATE_INFO ||
+    if (!apiLayerInfo || apiLayerInfo->structType != XR_LOADER_INTERFACE_STRUCT_API_LAYER_CREATE_INFO ||
         apiLayerInfo->structVersion > XR_API_LAYER_CREATE_INFO_STRUCT_VERSION ||
         apiLayerInfo->structSize < sizeof(XrApiLayerCreateInfo)) {
-        MONOEYE_LOG_ERROR("Invalid apiLayerInfo struct");
+        MONOEYE_LOG_ERROR("LayerXrCreateApiLayerInstance: Invalid apiLayerInfo struct");
         return XR_ERROR_INITIALIZATION_FAILED;
     }
 
@@ -34,7 +34,14 @@ XrResult LayerXrCreateApiLayerInstance(
         apiLayerInfo->nextInfo->structType != XR_LOADER_INTERFACE_STRUCT_API_LAYER_NEXT_INFO ||
         apiLayerInfo->nextInfo->structVersion > XR_API_LAYER_NEXT_INFO_STRUCT_VERSION ||
         apiLayerInfo->nextInfo->structSize < sizeof(XrApiLayerNextInfo)) {
-        MONOEYE_LOG_ERROR("Invalid nextInfo struct");
+        MONOEYE_LOG_ERROR("LayerXrCreateApiLayerInstance: Invalid nextInfo struct");
+        return XR_ERROR_INITIALIZATION_FAILED;
+    }
+
+    // Ensure we have the necessary function pointers from the loader
+    if (!apiLayerInfo->nextInfo->nextCreateApiLayerInstance ||
+        !apiLayerInfo->nextInfo->nextGetInstanceProcAddr) {
+        MONOEYE_LOG_ERROR("LayerXrCreateApiLayerInstance: Missing required function pointers from loader");
         return XR_ERROR_INITIALIZATION_FAILED;
     }
 
@@ -49,6 +56,7 @@ XrResult LayerXrCreateApiLayerInstance(
     // Get the next layer's xrCreateApiLayerInstance function pointer
     PFN_xrCreateApiLayerInstance nextCreateInstance =
         apiLayerInfo->nextInfo->nextCreateApiLayerInstance;
+
 
     if (!nextCreateInstance) {
         MONOEYE_LOG_ERROR("nextCreateApiLayerInstance is null");

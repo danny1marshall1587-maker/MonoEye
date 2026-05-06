@@ -85,9 +85,30 @@ extern "C" XrResult monoeye_xrReleaseSwapchainImage(
     const XrSwapchainImageReleaseInfo* releaseInfo
 );
 
-extern "C" XrResult monoeye_xrGetVulkanGraphicsRequirements2KHR(
+extern "C" XrResult monoeye_xrGetVulkanGraphicsRequirementsKHR(
     XrInstance instance,
     XrSystemId systemId,
+    XrGraphicsRequirementsVulkanKHR* graphicsRequirements
+) {
+    monoeye::XrGeneratedDispatchTable* dispatch = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(monoeye::g_instance_dispatch_mutex);
+        auto it = monoeye::g_instance_dispatch_map.find(instance);
+        if (it != monoeye::g_instance_dispatch_map.end()) {
+            dispatch = it->second;
+        }
+    }
+
+    if (!dispatch || !dispatch->xrGetVulkanGraphicsRequirementsKHR) {
+        return XR_ERROR_RUNTIME_FAILURE;
+    }
+
+    return ((PFN_xrGetVulkanGraphicsRequirementsKHR)dispatch->xrGetVulkanGraphicsRequirementsKHR)(instance, systemId, graphicsRequirements);
+}
+
+extern "C" XrResult monoeye_xrGetVulkanGraphicsRequirements2KHR(
+    XrInstance instance,
+    const XrVulkanGraphicsRequirementsGetInfoKHR* getInfo,
     XrGraphicsRequirementsVulkanKHR* graphicsRequirements
 ) {
     monoeye::XrGeneratedDispatchTable* dispatch = nullptr;
@@ -103,10 +124,30 @@ extern "C" XrResult monoeye_xrGetVulkanGraphicsRequirements2KHR(
         return XR_ERROR_RUNTIME_FAILURE;
     }
 
-    return ((PFN_xrGetVulkanGraphicsRequirements2KHR)dispatch->xrGetVulkanGraphicsRequirements2KHR)(instance, systemId, graphicsRequirements);
-
+    return ((PFN_xrGetVulkanGraphicsRequirements2KHR)dispatch->xrGetVulkanGraphicsRequirements2KHR)(instance, getInfo, graphicsRequirements);
 }
 
+extern "C" XrResult monoeye_xrGetVulkanGraphicsDeviceKHR(
+    XrInstance instance,
+    XrSystemId systemId,
+    VkInstance vkInstance,
+    VkPhysicalDevice* vkPhysicalDevice
+) {
+    monoeye::XrGeneratedDispatchTable* dispatch = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(monoeye::g_instance_dispatch_mutex);
+        auto it = monoeye::g_instance_dispatch_map.find(instance);
+        if (it != monoeye::g_instance_dispatch_map.end()) {
+            dispatch = it->second;
+        }
+    }
+
+    if (!dispatch || !dispatch->xrGetVulkanGraphicsDeviceKHR) {
+        return XR_ERROR_RUNTIME_FAILURE;
+    }
+
+    return ((PFN_xrGetVulkanGraphicsDeviceKHR)dispatch->xrGetVulkanGraphicsDeviceKHR)(instance, systemId, vkInstance, vkPhysicalDevice);
+}
 
 extern "C" XrResult monoeye_xrGetVulkanGraphicsDevice2KHR(
     XrInstance instance,
@@ -127,8 +168,8 @@ extern "C" XrResult monoeye_xrGetVulkanGraphicsDevice2KHR(
     }
 
     return ((PFN_xrGetVulkanGraphicsDevice2KHR)dispatch->xrGetVulkanGraphicsDevice2KHR)(instance, getInfo, vkPhysicalDevice);
-
 }
+
 
 #ifdef _WIN32
 extern "C" XrResult monoeye_xrGetD3D11GraphicsRequirementsKHR(
@@ -186,9 +227,9 @@ static const HookedFunction s_hooked_functions[] = {
     {"xrWaitSwapchainImage",    (PFN_xrVoidFunction)monoeye_xrWaitSwapchainImage},
     {"xrReleaseSwapchainImage", (PFN_xrVoidFunction)monoeye_xrReleaseSwapchainImage},
     {"xrGetVulkanGraphicsRequirements2KHR", (PFN_xrVoidFunction)monoeye_xrGetVulkanGraphicsRequirements2KHR},
-    {"xrGetVulkanGraphicsRequirementsKHR",  (PFN_xrVoidFunction)monoeye_xrGetVulkanGraphicsRequirements2KHR},
+    {"xrGetVulkanGraphicsRequirementsKHR",  (PFN_xrVoidFunction)monoeye_xrGetVulkanGraphicsRequirementsKHR},
     {"xrGetVulkanGraphicsDevice2KHR",       (PFN_xrVoidFunction)monoeye_xrGetVulkanGraphicsDevice2KHR},
-    {"xrGetVulkanGraphicsDeviceKHR",        (PFN_xrVoidFunction)monoeye_xrGetVulkanGraphicsDevice2KHR},
+    {"xrGetVulkanGraphicsDeviceKHR",        (PFN_xrVoidFunction)monoeye_xrGetVulkanGraphicsDeviceKHR},
 #ifdef _WIN32
     {"xrGetD3D11GraphicsRequirementsKHR", (PFN_xrVoidFunction)monoeye_xrGetD3D11GraphicsRequirementsKHR},
     {"xrGetD3D12GraphicsRequirementsKHR", (PFN_xrVoidFunction)monoeye_xrGetD3D12GraphicsRequirementsKHR},
@@ -243,7 +284,8 @@ XrResult LayerXrGetInstanceProcAddr(
         return monoeye::g_nextGetInstanceProcAddr(instance, name, function);
     }
 
-    MONOEYE_LOG_ERROR("xrGetInstanceProcAddr: no downstream handler for '%s' (instance: %p)", 
+    MONOEYE_LOG_ERROR("xrGetInstanceProcAddr: no downstream handler for '%s' (instance: %p). "
+                      "This might be a required D3D/Vulkan extension missing from the hook table.", 
                       name, (void*)instance);
     *function = nullptr;
     return XR_ERROR_FUNCTION_UNSUPPORTED;

@@ -2,17 +2,19 @@
     "file_format_version": "1.0.0",
     "api_layer": {
         "name": "XR_APILAYER_NOVENDOR_monoeye",
-        "library_path": "XR_APILAYER_NOVENDOR_monoeye.dll",
+        "library_path": ".\\XR_APILAYER_NOVENDOR_monoeye.dll",
         "api_version": "1.0",
         "implementation_version": "26",
         "description": "MonoEye - Single-eye VR rendering with depth-based second eye reconstruction. Reduces VR GPU workload by ~45% using depth-warp stereoscopic reconstruction.",
+        "functions": {
+            "xrNegotiateLoaderApiLayerInterface": "xrNegotiateLoaderApiLayerInterface"
+        },
         "instance_extensions": [
             {
                 "name": "XR_KHR_composition_layer_depth",
                 "extension_version": "1"
             }
         ],
-        "enable_environment": "MONOEYE_ENABLE",
         "disable_environment": "MONOEYE_DISABLE"
     }
 }

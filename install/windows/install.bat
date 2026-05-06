@@ -83,11 +83,10 @@ del "%TEMP%\create_link.vbs"
 
 echo   - Desktop shortcut created
 
-:: Enable MonoEye by default
+:: MonoEye is now enabled by default via the API layer manifest.
+:: Use MONOEYE_DISABLE=1 to disable.
 echo.
-echo Enabling MonoEye...
-setx MONOEYE_ENABLE 1 /M >nul
-echo   - MONOEYE_ENABLE=1 set
+echo MonoEye is ENABLED by default.
 
 :: Register OpenXR API Layer in Registry
 echo Registering OpenXR API Layer...
