@@ -42,7 +42,7 @@ namespace MonoEyeSwitcher
 
         private void InitializeComponent()
         {
-            this.Text = "MonoEye Switcher v0.5.15 (Alpha)";
+            this.Text = "MonoEye Switcher v0.5.16 (Alpha)";
             this.Size = new Size(420, 560);
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
@@ -481,92 +481,74 @@ namespace MonoEyeSwitcher
 
         private void RegisterOpenXRLayer(bool enable)
         {
-            string jsonPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "XR_APILAYER_NOVENDOR_monoeye.json");
-            string subKey = @"SOFTWARE\Khronos\OpenXR\1\ApiLayers\Implicit";
+            // Always clean up any existing monoeye registrations first (aggressive cleanup)
+            SuperCleanMonoEyeRegistrations();
 
-            // Cleanup any old explicit registrations to prevent duplicates
-            CleanExplicitRegistrations(jsonPath);
-
-            try
+            if (enable)
             {
-                if (enable)
+                string jsonPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "XR_APILAYER_NOVENDOR_monoeye.json");
+                string subKey = @"SOFTWARE\Khronos\OpenXR\1\ApiLayers\Implicit";
+
+                try
                 {
-                    // Try LocalMachine (preferred for EAC/Stability)
+                    // Prefer HKLM for stability/EAC compliance
                     using (RegistryKey key = Registry.LocalMachine.CreateSubKey(subKey))
                     {
                         key.SetValue(jsonPath, 0, RegistryValueKind.DWord);
                     }
-                    
-                    // CRITICAL: Remove from CurrentUser if it exists there, 
-                    // otherwise the loader will load us twice and cause a crash loop.
-                    try {
-                        using (RegistryKey key = Registry.CurrentUser.OpenSubKey(subKey, true))
-                        {
-                            if (key != null) key.DeleteValue(jsonPath, false);
-                        }
-                    } catch {}
                 }
-                else
+                catch (Exception)
                 {
-                    // Disable: Remove from both
-                    using (RegistryKey key = Registry.LocalMachine.OpenSubKey(subKey, true))
-                    {
-                        if (key != null) key.DeleteValue(jsonPath, false);
-                    }
-                    using (RegistryKey key = Registry.CurrentUser.OpenSubKey(subKey, true))
-                    {
-                        if (key != null) key.DeleteValue(jsonPath, false);
-                    }
-                }
-            }
-            catch (Exception)
-            {
-                // Fallback to CurrentUser if LocalMachine fails (e.g. no admin)
-                if (enable)
-                {
-                    using (RegistryKey key = Registry.CurrentUser.CreateSubKey(subKey))
-                    {
-                        key.SetValue(jsonPath, 0, RegistryValueKind.DWord);
-                    }
-                    
-                    // Also try to clean up HKLM if we previously succeeded but now failed
+                    // Fallback to HKCU if no admin
                     try {
-                        using (RegistryKey key = Registry.LocalMachine.OpenSubKey(subKey, true))
+                        using (RegistryKey key = Registry.CurrentUser.CreateSubKey(subKey))
                         {
-                            if (key != null) key.DeleteValue(jsonPath, false);
+                            key.SetValue(jsonPath, 0, RegistryValueKind.DWord);
                         }
-                    } catch {}
+                    } catch (Exception ex) {
+                        MessageBox.Show("Failed to register OpenXR layer: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
                 }
             }
         }
 
-        private void CleanExplicitRegistrations(string jsonPath)
+        private void SuperCleanMonoEyeRegistrations()
         {
-            string explicitKey = @"SOFTWARE\Khronos\OpenXR\1\ApiLayers\Explicit";
-            
-            // Clean HKLM
-            try {
-                using (RegistryKey key = Registry.LocalMachine.OpenSubKey(explicitKey, true))
-                {
-                    if (key != null) key.DeleteValue(jsonPath, false);
-                }
-            } catch {}
-            
-            // Clean HKCU
-            try {
-                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(explicitKey, true))
-                {
-                    if (key != null) key.DeleteValue(jsonPath, false);
-                }
-            } catch {}
-            
-            // Clean WOW6432Node (32-bit compatibility)
-            try {
-                using (RegistryKey key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\WOW6432Node\Khronos\OpenXR\1\ApiLayers\Explicit", true))
-                {
-                    if (key != null) key.DeleteValue(jsonPath, false);
-                }
-            } catch {}
+            string[] keys = {
+                @"SOFTWARE\Khronos\OpenXR\1\ApiLayers\Implicit",
+                @"SOFTWARE\Khronos\OpenXR\1\ApiLayers\Explicit",
+                @"SOFTWARE\WOW6432Node\Khronos\OpenXR\1\ApiLayers\Implicit",
+                @"SOFTWARE\WOW6432Node\Khronos\OpenXR\1\ApiLayers\Explicit"
+            };
+
+            foreach (string subKey in keys)
+            {
+                // Clean HKLM
+                try {
+                    using (RegistryKey key = Registry.LocalMachine.OpenSubKey(subKey, true)) {
+                        if (key != null) {
+                            foreach (string valueName in key.GetValueNames()) {
+                                if (valueName.IndexOf("monoeye", StringComparison.OrdinalIgnoreCase) >= 0) {
+                                    key.DeleteValue(valueName, false);
+                                }
+                            }
+                        }
+                    }
+                } catch {}
+
+                // Clean HKCU
+                try {
+                    using (RegistryKey key = Registry.CurrentUser.OpenSubKey(subKey, true)) {
+                        if (key != null) {
+                            foreach (string valueName in key.GetValueNames()) {
+                                if (valueName.IndexOf("monoeye", StringComparison.OrdinalIgnoreCase) >= 0) {
+                                    key.DeleteValue(valueName, false);
+                                }
+                            }
+                        }
+                    }
+                } catch {}
+            }
         }
 
         private void SaveButton_Click(object sender, EventArgs e)
