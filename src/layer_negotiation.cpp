@@ -34,7 +34,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
 // The core negotiation function - this is the only function the loader calls
 // directly from our DLL via GetProcAddress. Everything else goes through
 // xrGetInstanceProcAddr.
-extern "C" MONOEYE_EXPORT XrResult xrNegotiateLoaderApiLayerInterface(
+extern "C" MONOEYE_EXPORT XRAPI_ATTR XrResult XRAPI_CALL xrNegotiateLoaderApiLayerInterface(
     const XrNegotiateLoaderInfo* loaderInfo,
     const char* apiLayerName,
     XrNegotiateApiLayerRequest* apiLayerRequest

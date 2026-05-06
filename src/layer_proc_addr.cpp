@@ -14,27 +14,27 @@
 
 
 // Forward declarations of our hooked functions
-extern "C" XrResult monoeye_xrBeginFrame(
+extern "C" XrResult XRAPI_CALL monoeye_xrBeginFrame(
     XrSession session,
     const XrFrameBeginInfo* frameBeginInfo
 );
 
-extern "C" XrResult monoeye_xrEndFrame(
+extern "C" XrResult XRAPI_CALL monoeye_xrEndFrame(
     XrSession session,
     const XrFrameEndInfo* frameEndInfo
 );
 
-extern "C" XrResult monoeye_xrCreateSession(
+extern "C" XrResult XRAPI_CALL monoeye_xrCreateSession(
     XrInstance instance,
     const XrSessionCreateInfo* createInfo,
     XrSession* session
 );
 
-extern "C" XrResult monoeye_xrDestroySession(
+extern "C" XrResult XRAPI_CALL monoeye_xrDestroySession(
     XrSession session
 );
 
-extern "C" XrResult monoeye_xrEnumerateViewConfigurationViews(
+extern "C" XrResult XRAPI_CALL monoeye_xrEnumerateViewConfigurationViews(
     XrInstance instance,
     XrSystemId systemId,
     XrViewConfigurationType viewConfigurationType,
@@ -43,7 +43,7 @@ extern "C" XrResult monoeye_xrEnumerateViewConfigurationViews(
     XrViewConfigurationView* views
 );
 
-extern "C" XrResult monoeye_xrLocateViews(
+extern "C" XrResult XRAPI_CALL monoeye_xrLocateViews(
     XrSession session,
     const XrViewLocateInfo* viewLocateInfo,
     XrViewState* viewState,
@@ -52,40 +52,40 @@ extern "C" XrResult monoeye_xrLocateViews(
     XrView* views
 );
 
-extern "C" XrResult monoeye_xrCreateSwapchain(
+extern "C" XrResult XRAPI_CALL monoeye_xrCreateSwapchain(
     XrSession session,
     const XrSwapchainCreateInfo* createInfo,
     XrSwapchain* swapchain
 );
 
-extern "C" XrResult monoeye_xrDestroySwapchain(
+extern "C" XrResult XRAPI_CALL monoeye_xrDestroySwapchain(
     XrSwapchain swapchain
 );
 
-extern "C" XrResult monoeye_xrEnumerateSwapchainImages(
+extern "C" XrResult XRAPI_CALL monoeye_xrEnumerateSwapchainImages(
     XrSwapchain swapchain,
     uint32_t swapchainImageCapacityInput,
     uint32_t* swapchainImageCountOutput,
     XrSwapchainImageBaseHeader* swapchainImages
 );
 
-extern "C" XrResult monoeye_xrAcquireSwapchainImage(
+extern "C" XrResult XRAPI_CALL monoeye_xrAcquireSwapchainImage(
     XrSwapchain swapchain,
     const XrSwapchainImageAcquireInfo* acquireInfo,
     uint32_t* index
 );
 
-extern "C" XrResult monoeye_xrWaitSwapchainImage(
+extern "C" XrResult XRAPI_CALL monoeye_xrWaitSwapchainImage(
     XrSwapchain swapchain,
     const XrSwapchainImageWaitInfo* waitInfo
 );
 
-extern "C" XrResult monoeye_xrReleaseSwapchainImage(
+extern "C" XrResult XRAPI_CALL monoeye_xrReleaseSwapchainImage(
     XrSwapchain swapchain,
     const XrSwapchainImageReleaseInfo* releaseInfo
 );
 
-extern "C" XrResult monoeye_xrGetVulkanGraphicsRequirementsKHR(
+extern "C" XrResult XRAPI_CALL monoeye_xrGetVulkanGraphicsRequirementsKHR(
     XrInstance instance,
     XrSystemId systemId,
     XrGraphicsRequirementsVulkanKHR* graphicsRequirements
@@ -106,7 +106,7 @@ extern "C" XrResult monoeye_xrGetVulkanGraphicsRequirementsKHR(
     return ((PFN_xrGetVulkanGraphicsRequirementsKHR)dispatch->xrGetVulkanGraphicsRequirementsKHR)(instance, systemId, graphicsRequirements);
 }
 
-extern "C" XrResult monoeye_xrGetVulkanGraphicsRequirements2KHR(
+extern "C" XrResult XRAPI_CALL monoeye_xrGetVulkanGraphicsRequirements2KHR(
     XrInstance instance,
     XrSystemId systemId,
     XrGraphicsRequirementsVulkanKHR* graphicsRequirements
@@ -128,7 +128,7 @@ extern "C" XrResult monoeye_xrGetVulkanGraphicsRequirements2KHR(
 }
 
 
-extern "C" XrResult monoeye_xrGetVulkanGraphicsDeviceKHR(
+extern "C" XrResult XRAPI_CALL monoeye_xrGetVulkanGraphicsDeviceKHR(
     XrInstance instance,
     XrSystemId systemId,
     VkInstance vkInstance,
@@ -150,7 +150,7 @@ extern "C" XrResult monoeye_xrGetVulkanGraphicsDeviceKHR(
     return ((PFN_xrGetVulkanGraphicsDeviceKHR)dispatch->xrGetVulkanGraphicsDeviceKHR)(instance, systemId, vkInstance, vkPhysicalDevice);
 }
 
-extern "C" XrResult monoeye_xrGetVulkanGraphicsDevice2KHR(
+extern "C" XrResult XRAPI_CALL monoeye_xrGetVulkanGraphicsDevice2KHR(
     XrInstance instance,
     const XrVulkanGraphicsDeviceGetInfoKHR* getInfo,
     VkPhysicalDevice* vkPhysicalDevice
@@ -173,7 +173,7 @@ extern "C" XrResult monoeye_xrGetVulkanGraphicsDevice2KHR(
 
 
 #ifdef _WIN32
-extern "C" XrResult monoeye_xrGetD3D11GraphicsRequirementsKHR(
+extern "C" XrResult XRAPI_CALL monoeye_xrGetD3D11GraphicsRequirementsKHR(
     XrInstance instance,
     XrSystemId systemId,
     XrGraphicsRequirementsD3D11KHR* graphicsRequirements
@@ -190,7 +190,7 @@ extern "C" XrResult monoeye_xrGetD3D11GraphicsRequirementsKHR(
     return ((PFN_xrGetD3D11GraphicsRequirementsKHR)dispatch->xrGetD3D11GraphicsRequirementsKHR)(instance, systemId, graphicsRequirements);
 }
 
-extern "C" XrResult monoeye_xrGetD3D12GraphicsRequirementsKHR(
+extern "C" XrResult XRAPI_CALL monoeye_xrGetD3D12GraphicsRequirementsKHR(
     XrInstance instance,
     XrSystemId systemId,
     XrGraphicsRequirementsD3D12KHR* graphicsRequirements
@@ -240,7 +240,7 @@ static const HookedFunction s_hooked_functions[] = {
     {nullptr, nullptr}
 };
 
-XrResult LayerXrGetInstanceProcAddr(
+XrResult XRAPI_CALL LayerXrGetInstanceProcAddr(
     XrInstance instance,
     const char* name,
     PFN_xrVoidFunction* function

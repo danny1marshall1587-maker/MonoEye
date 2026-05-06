@@ -23,7 +23,7 @@ static std::mutex s_frame_mutex;
 static XrFrameState s_last_frame_state = {};
 static bool s_frame_state_valid = false;
 
-extern "C" XrResult monoeye_xrBeginFrame(
+extern "C" XrResult XRAPI_CALL monoeye_xrBeginFrame(
     XrSession session,
     const XrFrameBeginInfo* frameBeginInfo
 ) {
@@ -64,7 +64,7 @@ extern "C" XrResult monoeye_xrBeginFrame(
 
 }
 
-extern "C" XrResult monoeye_xrEndFrame(
+extern "C" XrResult XRAPI_CALL monoeye_xrEndFrame(
     XrSession session,
     const XrFrameEndInfo* frameEndInfo
 ) {

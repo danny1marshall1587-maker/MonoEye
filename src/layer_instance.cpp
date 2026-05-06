@@ -10,7 +10,7 @@
 
 namespace monoeye {
 
-XrResult LayerXrCreateApiLayerInstance(
+XrResult XRAPI_CALL LayerXrCreateApiLayerInstance(
     const XrInstanceCreateInfo* info,
     const XrApiLayerCreateInfo* apiLayerInfo,
     XrInstance* instance
@@ -152,7 +152,7 @@ XrResult LayerXrCreateApiLayerInstance(
     return XR_SUCCESS;
 }
 
-XrResult LayerXrDestroyInstance(XrInstance instance) {
+XrResult XRAPI_CALL LayerXrDestroyInstance(XrInstance instance) {
     MONOEYE_LOG("LayerXrDestroyInstance called for instance %p", (void*)(uintptr_t)instance);
 
     XrGeneratedDispatchTable* nextDispatch = nullptr;

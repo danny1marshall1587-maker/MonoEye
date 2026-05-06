@@ -17,7 +17,7 @@ namespace monoeye {
 extern std::mutex s_session_map_mutex;
 extern std::unordered_map<XrSession, SessionState> s_session_map;
 
-extern "C" XrResult monoeye_xrCreateSwapchain(
+extern "C" XrResult XRAPI_CALL monoeye_xrCreateSwapchain(
     XrSession session,
     const XrSwapchainCreateInfo* createInfo,
     XrSwapchain* swapchain
@@ -109,7 +109,7 @@ extern "C" XrResult monoeye_xrCreateSwapchain(
     return result;
 }
 
-extern "C" XrResult monoeye_xrDestroySwapchain(XrSwapchain swapchain) {
+extern "C" XrResult XRAPI_CALL monoeye_xrDestroySwapchain(XrSwapchain swapchain) {
     MONOEYE_LOG("xrDestroySwapchain: %p", (void*)(uintptr_t)swapchain);
 
     SwapchainTracker::get_instance().untrack_swapchain(swapchain);
@@ -135,7 +135,7 @@ extern "C" XrResult monoeye_xrDestroySwapchain(XrSwapchain swapchain) {
 
 }
 
-extern "C" XrResult monoeye_xrEnumerateSwapchainImages(
+extern "C" XrResult XRAPI_CALL monoeye_xrEnumerateSwapchainImages(
     XrSwapchain swapchain,
     uint32_t swapchainImageCapacityInput,
     uint32_t* swapchainImageCountOutput,
@@ -165,7 +165,7 @@ extern "C" XrResult monoeye_xrEnumerateSwapchainImages(
 
 }
 
-extern "C" XrResult monoeye_xrAcquireSwapchainImage(
+extern "C" XrResult XRAPI_CALL monoeye_xrAcquireSwapchainImage(
     XrSwapchain swapchain,
     const XrSwapchainImageAcquireInfo* acquireInfo,
     uint32_t* index
@@ -190,7 +190,7 @@ extern "C" XrResult monoeye_xrAcquireSwapchainImage(
 
 }
 
-extern "C" XrResult monoeye_xrWaitSwapchainImage(
+extern "C" XrResult XRAPI_CALL monoeye_xrWaitSwapchainImage(
     XrSwapchain swapchain,
     const XrSwapchainImageWaitInfo* waitInfo
 ) {
@@ -214,7 +214,7 @@ extern "C" XrResult monoeye_xrWaitSwapchainImage(
 
 }
 
-extern "C" XrResult monoeye_xrReleaseSwapchainImage(
+extern "C" XrResult XRAPI_CALL monoeye_xrReleaseSwapchainImage(
     XrSwapchain swapchain,
     const XrSwapchainImageReleaseInfo* releaseInfo
 ) {

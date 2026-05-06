@@ -14,7 +14,7 @@ namespace monoeye {
 extern std::mutex s_session_map_mutex;
 extern std::unordered_map<XrSession, SessionState> s_session_map;
 
-extern "C" XrResult monoeye_xrEnumerateViewConfigurationViews(
+extern "C" XrResult XRAPI_CALL monoeye_xrEnumerateViewConfigurationViews(
     XrInstance instance,
     XrSystemId systemId,
     XrViewConfigurationType viewConfigurationType,
@@ -60,7 +60,7 @@ extern "C" XrResult monoeye_xrEnumerateViewConfigurationViews(
     return XR_SUCCESS;
 }
 
-extern "C" XrResult monoeye_xrLocateViews(
+extern "C" XrResult XRAPI_CALL monoeye_xrLocateViews(
     XrSession session,
     const XrViewLocateInfo* viewLocateInfo,
     XrViewState* viewState,
