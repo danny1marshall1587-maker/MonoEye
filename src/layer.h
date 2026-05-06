@@ -4,10 +4,16 @@
 #pragma once
 
 #ifdef _WIN32
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
+    #ifndef NOMINMAX
+    #define NOMINMAX
+    #endif
+    #ifndef WIN32_LEAN_AND_MEAN
+    #define WIN32_LEAN_AND_MEAN
+    #endif
+    #include <windows.h>
+    #include <unknwn.h>
+    #include <d3d11.h>
+    #include <d3d12.h>
 #endif
 
 // Platform-specific export macros
@@ -38,10 +44,6 @@
     #ifndef XR_USE_GRAPHICS_API_D3D12
     #define XR_USE_GRAPHICS_API_D3D12
     #endif
-
-    #include <unknwn.h>
-    #include <d3d11.h>
-    #include <d3d12.h>
 #endif
 
 // OpenXR includes
