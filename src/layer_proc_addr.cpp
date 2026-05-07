@@ -62,6 +62,10 @@ extern "C" XrResult XRAPI_CALL monoeye_xrDestroySwapchain(
     XrSwapchain swapchain
 );
 
+extern "C" XrResult XRAPI_CALL LayerXrDestroyInstance(
+    XrInstance instance
+);
+
 extern "C" XrResult XRAPI_CALL monoeye_xrEnumerateSwapchainImages(
     XrSwapchain swapchain,
     uint32_t swapchainImageCapacityInput,
@@ -237,6 +241,7 @@ static const HookedFunction s_hooked_functions[] = {
 #endif
     {"xrEnumerateViewConfigurationViews",   (PFN_xrVoidFunction)monoeye_xrEnumerateViewConfigurationViews},
     {"xrLocateViews",                       (PFN_xrVoidFunction)monoeye_xrLocateViews},
+    {"xrDestroyInstance",                   (PFN_xrVoidFunction)LayerXrDestroyInstance},
     {nullptr, nullptr}
 };
 
@@ -251,7 +256,7 @@ XrResult XRAPI_CALL LayerXrGetInstanceProcAddr(
 
     MONOEYE_LOG_DEBUG("xrGetInstanceProcAddr: %s", name);
 
-    // Check if this is a function we hook — return our override immediately
+    // 1. Check if this is a function we hook — return our override immediately
     for (int i = 0; s_hooked_functions[i].name != nullptr; ++i) {
         if (strcmp(name, s_hooked_functions[i].name) == 0) {
             *function = s_hooked_functions[i].function;
@@ -260,7 +265,7 @@ XrResult XRAPI_CALL LayerXrGetInstanceProcAddr(
         }
     }
 
-    // 1. Try the per-instance dispatch table FIRST. This is the most accurate
+    // 2. Try the per-instance dispatch table. This is the most accurate
     // way to find the "next" function in the chain for a specific instance.
     if (instance != XR_NULL_HANDLE) {
         XrGeneratedDispatchTable* dispatch = nullptr;
@@ -272,21 +277,21 @@ XrResult XRAPI_CALL LayerXrGetInstanceProcAddr(
             }
         }
 
-        if (dispatch && dispatch->nextGetInstanceProcAddr &&
-            dispatch->nextGetInstanceProcAddr != LayerXrGetInstanceProcAddr) {
+        if (dispatch && dispatch->nextGetInstanceProcAddr) {
+            MONOEYE_LOG_DEBUG("  -> forwarding to instance nextGetInstanceProcAddr");
             return dispatch->nextGetInstanceProcAddr(instance, name, function);
         }
     }
 
-    // 2. Fallback to the global pointer (used for NULL instance calls or 
+    // 3. Fallback to the global pointer (used for NULL instance calls or 
     // if the instance isn't in our map yet).
-    if (monoeye::g_nextGetInstanceProcAddr &&
-        monoeye::g_nextGetInstanceProcAddr != LayerXrGetInstanceProcAddr) {
+    if (monoeye::g_nextGetInstanceProcAddr) {
+        MONOEYE_LOG_DEBUG("  -> forwarding to global g_nextGetInstanceProcAddr");
         return monoeye::g_nextGetInstanceProcAddr(instance, name, function);
     }
 
     MONOEYE_LOG_ERROR("xrGetInstanceProcAddr: no downstream handler for '%s' (instance: %p). "
-                      "This might be a required D3D/Vulkan extension missing from the hook table.", 
+                      "The call chain might be broken.", 
                       name, (void*)instance);
     *function = nullptr;
     return XR_ERROR_FUNCTION_UNSUPPORTED;
