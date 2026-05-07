@@ -129,6 +129,7 @@ monoeye_xrCreateSession(XrInstance instance,
 
           break;
         }
+#ifdef _WIN32
         else if (header->type == XR_TYPE_GRAPHICS_BINDING_D3D11_KHR ||
                  header->type == XR_TYPE_GRAPHICS_BINDING_D3D12_KHR) {
           
@@ -137,10 +138,11 @@ monoeye_xrCreateSession(XrInstance instance,
             OverlayManager::get_instance().initializeD3D11(instance, *session, db->device);
           } else {
             const XrGraphicsBindingD3D12KHR *db = reinterpret_cast<const XrGraphicsBindingD3D12KHR *>(header);
-            OverlayManager::get_instance().initializeD3D12(instance, *session, db->device, db->queueFamilyIndex);
+            OverlayManager::get_instance().initializeD3D12(instance, *session, db->device, db->queue);
           }
           break;
         }
+#endif
         header = header->next;
       }
     }

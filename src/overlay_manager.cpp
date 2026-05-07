@@ -210,7 +210,7 @@ void OverlayManager::initializeD3D11(XrInstance instance, XrSession session, ID3
     m_visible = false;
 }
 
-void OverlayManager::initializeD3D12(XrInstance instance, XrSession session, ID3D12Device* device, uint32_t queueFamilyIndex) {
+void OverlayManager::initializeD3D12(XrInstance instance, XrSession session, ID3D12Device* device, ID3D12CommandQueue* queue) {
     // Similar to D3D11, stubbed for now
     m_sessionType = SESSION_D3D12;
     MONOEYE_LOG("OverlayManager (D3D12) initialized (stub)");
