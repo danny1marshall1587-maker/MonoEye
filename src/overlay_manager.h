@@ -20,6 +20,10 @@ public:
     }
 
     void initialize(XrInstance instance, XrSession session, VkDevice device, VkPhysicalDevice physicalDevice, uint32_t queueFamilyIndex, VkQueue queue);
+#ifdef _WIN32
+    void initializeD3D11(XrInstance instance, XrSession session, struct ID3D11Device* device);
+    void initializeD3D12(XrInstance instance, XrSession session, struct ID3D12Device* device, uint32_t queueFamilyIndex);
+#endif
     void shutdown();
 
     // Begin a new UI frame
@@ -41,6 +45,14 @@ private:
     XrSession m_xrSession = XR_NULL_HANDLE;
     VkInstance m_vkInstance = VK_NULL_HANDLE;
     VkDevice m_vkDevice = VK_NULL_HANDLE;
+    
+#ifdef _WIN32
+    struct ID3D11Device* m_d3d11Device = nullptr;
+    struct ID3D11DeviceContext* m_d3d11Context = nullptr;
+    struct ID3D12Device* m_d3d12Device = nullptr;
+#endif
+
+    SessionType m_sessionType = SESSION_UNKNOWN;
     
     XrSwapchain m_swapchain = XR_NULL_HANDLE;
     std::vector<VkImage> m_images;

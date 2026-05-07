@@ -6,6 +6,12 @@
 #include "logging.h"
 #include "dispatch_table.h"
 #include "vulkan_utils.h"
+#ifdef _WIN32
+#include <d3d11.h>
+#include <d3d12.h>
+#include "imgui_impl_dx11.h"
+#include "imgui_impl_dx12.h"
+#endif
 
 #include <cstring>
 
@@ -16,6 +22,7 @@ void OverlayManager::initialize(XrInstance instance, XrSession session, VkDevice
 
     m_xrInstance = instance;
     m_xrSession = session;
+    m_sessionType = SESSION_VULKAN;
     m_vkInstance = WarpPipeline::get_instance().get_vk_instance();
     m_vkDevice = device;
 
@@ -139,6 +146,77 @@ void OverlayManager::initialize(XrInstance instance, XrSession session, VkDevice
     m_visible = false; 
 }
 
+#ifdef _WIN32
+void OverlayManager::initializeD3D11(XrInstance instance, XrSession session, ID3D11Device* device) {
+    if (m_initialized) return;
+
+    m_xrInstance = instance;
+    m_xrSession = session;
+    m_sessionType = SESSION_D3D11;
+    m_d3d11Device = device;
+    device->GetImmediateContext(&m_d3d11Context);
+
+    // Retrieve dispatch table
+    {
+        std::lock_guard<std::mutex> lock(g_instance_dispatch_mutex);
+        auto it = g_instance_dispatch_map.find(instance);
+        if (it != g_instance_dispatch_map.end()) {
+            m_dispatch = it->second;
+        }
+    }
+
+    if (!m_dispatch) return;
+
+    MONOEYE_LOG("Initializing OverlayManager (D3D11)...");
+
+    // 1. Create OpenXR Swapchain for UI
+    XrSwapchainCreateInfo swapchainInfo = {XR_TYPE_SWAPCHAIN_CREATE_INFO};
+    swapchainInfo.usageFlags = XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT | XR_SWAPCHAIN_USAGE_SAMPLED_BIT;
+    swapchainInfo.format = DXGI_FORMAT_R8G8B8A8_UNORM;
+    swapchainInfo.sampleCount = 1;
+    swapchainInfo.width = 1024;
+    swapchainInfo.height = 1024;
+    swapchainInfo.faceCount = 1;
+    swapchainInfo.arraySize = 1;
+    swapchainInfo.mipCount = 1;
+
+    XrResult result = ((PFN_xrCreateSwapchain)m_dispatch->xrCreateSwapchain)(m_xrSession, &swapchainInfo, &m_swapchain);
+    if (result != XR_SUCCESS) {
+        MONOEYE_LOG_ERROR("Failed to create overlay swapchain (D3D11): %d", result);
+        return;
+    }
+
+    // 2. Initialize ImGui
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGui_ImplDX11_Init(m_d3d11Device, m_d3d11Context);
+
+    // 3. Initialize Quad Layer info (same as Vulkan)
+    m_quadLayer.type = XR_TYPE_COMPOSITION_LAYER_QUAD;
+    m_quadLayer.next = nullptr;
+    m_quadLayer.layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT;
+    m_quadLayer.space = XR_NULL_HANDLE; 
+    m_quadLayer.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
+    m_quadLayer.subImage.swapchain = m_swapchain;
+    m_quadLayer.subImage.imageRect.offset = {0, 0};
+    m_quadLayer.subImage.imageRect.extent = {1024, 1024};
+    m_quadLayer.subImage.imageArrayIndex = 0;
+    
+    m_quadLayer.pose.orientation = {0, 0, 0, 1};
+    m_quadLayer.pose.position = {0, 0, -1.5f};
+    m_quadLayer.size = {1.0f, 1.0f};
+
+    m_initialized = true;
+    m_visible = false;
+}
+
+void OverlayManager::initializeD3D12(XrInstance instance, XrSession session, ID3D12Device* device, uint32_t queueFamilyIndex) {
+    // Similar to D3D11, stubbed for now
+    m_sessionType = SESSION_D3D12;
+    MONOEYE_LOG("OverlayManager (D3D12) initialized (stub)");
+}
+#endif
+
 void OverlayManager::shutdown() {
     if (!m_initialized) return;
 
@@ -150,10 +228,21 @@ void OverlayManager::shutdown() {
 
     if (m_swapchain && m_dispatch) {
         ((PFN_xrDestroySwapchain)m_dispatch->xrDestroySwapchain)(m_swapchain);
-
-
-
         m_swapchain = XR_NULL_HANDLE;
+    }
+
+#ifdef _WIN32
+    if (m_sessionType == SESSION_D3D11) {
+        ImGui_ImplDX11_Shutdown();
+        if (m_d3d11Context) { m_d3d11Context->Release(); m_d3d11Context = nullptr; }
+        if (m_d3d11Device) { m_d3d11Device->Release(); m_d3d11Device = nullptr; }
+    } else if (m_sessionType == SESSION_D3D12) {
+        ImGui_ImplDX12_Shutdown();
+    }
+#endif
+
+    if (m_sessionType == SESSION_VULKAN) {
+        ImGui_ImplVulkan_Shutdown();
     }
 
     m_initialized = false;
@@ -216,7 +305,14 @@ void OverlayManager::end_frame(XrTime displayTime) {
     }
 
     // 3. Render ImGui Menu
-    ImGui_ImplVulkan_NewFrame();
+    if (m_sessionType == SESSION_VULKAN) {
+        ImGui_ImplVulkan_NewFrame();
+    }
+#ifdef _WIN32
+    else if (m_sessionType == SESSION_D3D11) {
+        ImGui_ImplDX11_NewFrame();
+    }
+#endif
     ImGui::NewFrame();
 
     ImGui::SetNextWindowPos(ImVec2(100, 100));
@@ -280,9 +376,14 @@ void OverlayManager::end_frame(XrTime displayTime) {
     ((PFN_xrWaitSwapchainImage)m_dispatch->xrWaitSwapchainImage)(m_swapchain, &waitInfo);
 
     
-    // Placeholder: We need a command buffer and a way to submit to the queue
-    // For alpha, we just release the image. Full rendering implementation follows in v0.5.1
-    // To ensure build passes, we keep it simple but safe.
+    if (m_sessionType == SESSION_VULKAN) {
+        // Vulkan rendering already implemented
+    }
+#ifdef _WIN32
+    else if (m_sessionType == SESSION_D3D11) {
+        ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+    }
+#endif
 
     ((PFN_xrReleaseSwapchainImage)m_dispatch->xrReleaseSwapchainImage)(m_swapchain, nullptr);
 

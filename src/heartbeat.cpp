@@ -19,8 +19,12 @@ void heartbeat_loop() {
     auto last_log_time = std::chrono::steady_clock::now();
     uint64_t last_frame_count = 0;
 
+    // Log immediately on startup
+    MONOEYE_LOG("[HEARTBEAT] Started. Monitoring session and frame status...");
+
     while (!s_stop_heartbeat) {
         std::this_thread::sleep_for(std::chrono::seconds(30));
+        if (s_stop_heartbeat) break;
         
         auto now = std::chrono::steady_clock::now();
         auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - last_log_time).count();

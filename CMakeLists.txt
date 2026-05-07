@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.18)
 project(MonoEye
-    VERSION 0.5.47
+    VERSION 0.5.48
 
     DESCRIPTION "MonoEye - Single-eye VR rendering with depth-based second eye reconstruction"
     LANGUAGES CXX
@@ -156,6 +156,8 @@ set(MONOEYE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui/imgui_widgets.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui/imgui_tables.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui/imgui_impl_vulkan.cpp
+    $<$<PLATFORM_ID:Windows>:${CMAKE_CURRENT_SOURCE_DIR}/external/imgui/imgui_impl_dx11.cpp>
+    $<$<PLATFORM_ID:Windows>:${CMAKE_CURRENT_SOURCE_DIR}/external/imgui/imgui_impl_dx12.cpp>
 )
 
 # Build the API layer shared library

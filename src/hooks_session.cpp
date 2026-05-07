@@ -129,6 +129,18 @@ monoeye_xrCreateSession(XrInstance instance,
 
           break;
         }
+        else if (header->type == XR_TYPE_GRAPHICS_BINDING_D3D11_KHR ||
+                 header->type == XR_TYPE_GRAPHICS_BINDING_D3D12_KHR) {
+          
+          if (header->type == XR_TYPE_GRAPHICS_BINDING_D3D11_KHR) {
+            const XrGraphicsBindingD3D11KHR *db = reinterpret_cast<const XrGraphicsBindingD3D11KHR *>(header);
+            OverlayManager::get_instance().initializeD3D11(instance, *session, db->device);
+          } else {
+            const XrGraphicsBindingD3D12KHR *db = reinterpret_cast<const XrGraphicsBindingD3D12KHR *>(header);
+            OverlayManager::get_instance().initializeD3D12(instance, *session, db->device, db->queueFamilyIndex);
+          }
+          break;
+        }
         header = header->next;
       }
     }
