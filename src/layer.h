@@ -80,14 +80,18 @@ extern PFN_xrGetInstanceProcAddr g_nextGetInstanceProcAddr;
 struct InstanceState;
 
 
+} // namespace monoeye
+
 // Internal layer functions (not exported directly)
+XrResult XRAPI_CALL LayerXrDestroyInstance(XrInstance instance);
+
+namespace monoeye {
+
 XrResult LayerXrCreateApiLayerInstance(
     const XrInstanceCreateInfo* info,
     const XrApiLayerCreateInfo* apiLayerInfo,
     XrInstance* instance
 );
-
-XrResult LayerXrDestroyInstance(XrInstance instance);
 
 XrResult LayerXrGetInstanceProcAddr(
     XrInstance instance,
