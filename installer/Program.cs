@@ -35,7 +35,7 @@ namespace MonoEyeInstaller
 
         private void InitializeComponent()
         {
-            this.Text = "MonoEye Setup v0.5.48";
+            this.Text = "MonoEye Setup v0.5.50";
             this.Size = new Size(500, 350);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
