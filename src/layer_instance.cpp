@@ -152,32 +152,32 @@ XrResult XRAPI_CALL LayerXrCreateApiLayerInstance(
     return XR_SUCCESS;
 }
 
-XrResult XRAPI_CALL LayerXrDestroyInstance(XrInstance instance) {
+} // namespace monoeye
+
+extern "C" XrResult XRAPI_CALL LayerXrDestroyInstance(XrInstance instance) {
     MONOEYE_LOG("LayerXrDestroyInstance called for instance %p", (void*)(uintptr_t)instance);
 
-    XrGeneratedDispatchTable* nextDispatch = nullptr;
+    monoeye::XrGeneratedDispatchTable* nextDispatch = nullptr;
     {
-        std::lock_guard<std::mutex> lock(g_instance_dispatch_mutex);
-        auto it = g_instance_dispatch_map.find(instance);
-        if (it != g_instance_dispatch_map.end()) {
+        std::lock_guard<std::mutex> lock(monoeye::g_instance_dispatch_mutex);
+        auto it = monoeye::g_instance_dispatch_map.find(instance);
+        if (it != monoeye::g_instance_dispatch_map.end()) {
             nextDispatch = it->second;
-            g_instance_dispatch_map.erase(it);
+            monoeye::g_instance_dispatch_map.erase(it);
         }
     }
 
+    XrResult result = XR_SUCCESS;
     if (nextDispatch) {
         // Call down to destroy the instance
         if (nextDispatch->xrDestroyInstance) {
-            ((PFN_xrDestroyInstance)nextDispatch->xrDestroyInstance)(instance);
+            result = ((PFN_xrDestroyInstance)nextDispatch->xrDestroyInstance)(instance);
         }
 
-
         // Clean up the dispatch table
-        MonoEyeCleanUpDispatchTable(nextDispatch);
+        monoeye::MonoEyeCleanUpDispatchTable(nextDispatch);
     }
 
-    MONOEYE_LOG("Instance %p destroyed", (void*)(uintptr_t)instance);
-    return XR_SUCCESS;
+    MONOEYE_LOG("Instance %p destroyed with result: %d", (void*)(uintptr_t)instance, result);
+    return result;
 }
-
-} // namespace monoeye

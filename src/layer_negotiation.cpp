@@ -21,15 +21,10 @@ void stop_heartbeat();
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
     switch (fdwReason) {
         case DLL_PROCESS_ATTACH:
-            // Disable thread library calls to avoid unnecessary overhead
             DisableThreadLibraryCalls(hinstDLL);
-            // Early log to confirm the DLL is loaded in the process
-            MONOEYE_LOG("--- MonoEye DLL Attached to Process ---");
-            monoeye::start_heartbeat();
             break;
         case DLL_PROCESS_DETACH:
             monoeye::stop_heartbeat();
-            MONOEYE_LOG("--- MonoEye DLL Detached from Process ---");
             break;
     }
     return TRUE;
@@ -93,10 +88,12 @@ extern "C" MONOEYE_EXPORT XRAPI_ATTR XrResult XRAPI_CALL xrNegotiateLoaderApiLay
     apiLayerRequest->getInstanceProcAddr = monoeye::LayerXrGetInstanceProcAddr;
     apiLayerRequest->createApiLayerInstance = monoeye::LayerXrCreateApiLayerInstance;
 
-
+    // Start services and log success now that we're safely outside DllMain
     MONOEYE_LOG("Negotiation successful - interface version: %u, API version: %u",
                 apiLayerRequest->layerInterfaceVersion,
                 apiLayerRequest->layerApiVersion);
+    
+    monoeye::start_heartbeat();
 
     return XR_SUCCESS;
 }

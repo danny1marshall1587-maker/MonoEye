@@ -62,7 +62,7 @@ extern "C" XrResult XRAPI_CALL monoeye_xrDestroySwapchain(
     XrSwapchain swapchain
 );
 
-extern "C" XrResult XRAPI_CALL LayerXrDestroyInstance(
+extern "C" XRAPI_ATTR XrResult XRAPI_CALL LayerXrDestroyInstance(
     XrInstance instance
 );
 
@@ -241,7 +241,7 @@ static const HookedFunction s_hooked_functions[] = {
 #endif
     {"xrEnumerateViewConfigurationViews",   (PFN_xrVoidFunction)monoeye_xrEnumerateViewConfigurationViews},
     {"xrLocateViews",                       (PFN_xrVoidFunction)monoeye_xrLocateViews},
-    {"xrDestroyInstance",                   (PFN_xrVoidFunction)LayerXrDestroyInstance},
+    {"xrDestroyInstance",                   (PFN_xrVoidFunction)::LayerXrDestroyInstance},
     {nullptr, nullptr}
 };
 
