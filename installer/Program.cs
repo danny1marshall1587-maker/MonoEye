@@ -237,7 +237,7 @@ namespace MonoEyeInstaller
         {
             try
             {
-                string desktop = Environment.GetFolderPath(Environment.SpecialFolder.PublicDesktop);
+                string desktop = Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory);
                 if (!Directory.Exists(desktop)) desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
                 
                 string shortcutPath = Path.Combine(desktop, name + ".lnk");
