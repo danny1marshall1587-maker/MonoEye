@@ -3,10 +3,12 @@
 #include <windows.h>
 #endif
 #include <iostream>
+#include <mutex>
 #include "../logging.h"
 
 // Pointer to the real OpenVR DLL
 static HMODULE s_realOpenVR = nullptr;
+static std::mutex s_load_mutex;
 
 typedef void* (VR_CALLTYPE *PFN_VR_InitInternal)(vr::EVRInitError *peError, vr::EVRApplicationType eApplicationType);
 typedef uint32_t (VR_CALLTYPE *PFN_VR_InitInternal2)(vr::EVRInitError *peError, vr::EVRApplicationType eApplicationType, const char *pStartupInfo);
@@ -33,12 +35,18 @@ static PFN_VR_IsInterfaceVersionValid g_real_VR_IsInterfaceVersionValid = nullpt
 static PFN_VR_GetInitToken g_real_VR_GetInitToken = nullptr;
 
 bool LoadRealOpenVR() {
+    std::lock_guard<std::mutex> lock(s_load_mutex);
     if (s_realOpenVR) return true;
 
-    // Load the real openvr_api_real.dll from a different name or path
-    s_realOpenVR = LoadLibraryA("openvr_api_real.dll");
+    // Use the suggested name for the original DLL
+    s_realOpenVR = LoadLibraryA("openvr_api_orig.dll");
     if (!s_realOpenVR) {
-        MONOEYE_LOG_ERROR("Failed to load real openvr_api_real.dll");
+        // Fallback to the old name just in case
+        s_realOpenVR = LoadLibraryA("openvr_api_real.dll");
+    }
+
+    if (!s_realOpenVR) {
+        // We cannot log here if the logging system isn't ready or depends on this DLL
         return false;
     }
 
@@ -57,8 +65,26 @@ bool LoadRealOpenVR() {
     return true;
 }
 
+namespace monoeye {
+
+// Static instance of our proxy compositor
+static ProxyCompositor* s_proxyCompositor = nullptr;
+static std::mutex s_proxy_mutex;
+
+vr::EVRCompositorError ProxyCompositor::Submit(vr::EVREye eEye, const vr::Texture_t *pTexture, const vr::VRTextureBounds_t* pBounds, vr::EVRSubmitFlags nSubmitFlags) {
+    // This is the point where we capture the texture for warping
+    // For now, just log that we were called (infrequently)
+    static int submit_count = 0;
+    if (submit_count++ % 1000 == 0) {
+        MONOEYE_LOG_DEBUG("ProxyCompositor::Submit called for eye %d", eEye);
+    }
+
+    return m_real->Submit(eEye, pTexture, pBounds, nSubmitFlags);
+}
+
+} // namespace monoeye
+
 extern "C" __declspec(dllexport) void* VR_CALLTYPE VR_InitInternal(vr::EVRInitError *peError, vr::EVRApplicationType eApplicationType) {
-    MONOEYE_LOG("OpenVR Proxy: VR_InitInternal called");
     if (!LoadRealOpenVR()) {
         if (peError) *peError = vr::VRInitError_Init_FileNotFound;
         return nullptr;
@@ -67,7 +93,6 @@ extern "C" __declspec(dllexport) void* VR_CALLTYPE VR_InitInternal(vr::EVRInitEr
 }
 
 extern "C" __declspec(dllexport) uint32_t VR_CALLTYPE VR_InitInternal2(vr::EVRInitError *peError, vr::EVRApplicationType eApplicationType, const char *pStartupInfo) {
-    MONOEYE_LOG("OpenVR Proxy: VR_InitInternal2 called");
     if (!LoadRealOpenVR()) {
         if (peError) *peError = vr::VRInitError_Init_FileNotFound;
         return 0;
@@ -77,7 +102,6 @@ extern "C" __declspec(dllexport) uint32_t VR_CALLTYPE VR_InitInternal2(vr::EVRIn
 }
 
 extern "C" __declspec(dllexport) void VR_CALLTYPE VR_ShutdownInternal() {
-    MONOEYE_LOG("OpenVR Proxy: VR_ShutdownInternal called");
     if (g_real_VR_ShutdownInternal) g_real_VR_ShutdownInternal();
 }
 
@@ -115,11 +139,18 @@ extern "C" __declspec(dllexport) void* VR_CALLTYPE VR_GetGenericInterface(const 
     if (!LoadRealOpenVR()) return nullptr;
     if (!g_real_VR_GetGenericInterface) return nullptr;
     
-    MONOEYE_LOG("OpenVR Proxy: Requesting interface %s", pchInterfaceVersion);
-    
     void* iface = g_real_VR_GetGenericInterface(pchInterfaceVersion, peError);
-    
-    // This is where we will wrap IVRCompositor and IVRSystem
+    if (!iface) return nullptr;
+
+    // Wrap the compositor if requested
+    if (strstr(pchInterfaceVersion, "IVRCompositor_")) {
+        std::lock_guard<std::mutex> lock(monoeye::s_proxy_mutex);
+        if (!monoeye::s_proxyCompositor) {
+            MONOEYE_LOG("OpenVR Proxy: Creating compositor wrapper for %s", pchInterfaceVersion);
+            monoeye::s_proxyCompositor = new monoeye::ProxyCompositor((vr::IVRCompositor*)iface);
+        }
+        return monoeye::s_proxyCompositor;
+    }
     
     return iface;
 }
@@ -135,4 +166,3 @@ extern "C" __declspec(dllexport) uint32_t VR_CALLTYPE VR_GetInitToken() {
     if (!g_real_VR_GetInitToken) return 0;
     return g_real_VR_GetInitToken();
 }
-

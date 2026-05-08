@@ -673,17 +673,20 @@ namespace MonoEyeSwitcher
                 {
                     string path = fbd.SelectedPath;
                     string targetDll = System.IO.Path.Combine(path, "openvr_api.dll");
-                    string backupDll = System.IO.Path.Combine(path, "openvr_api_real.dll");
+                    string backupDll = System.IO.Path.Combine(path, "openvr_api_orig.dll");
 
                     if (System.IO.File.Exists(targetDll))
                     {
-                        try {
-                            // 1. Backup original if not already done
+                        try
+                        {
+                            // If backup doesn't exist, create it from the current target
                             if (!System.IO.File.Exists(backupDll)) {
                                 System.IO.File.Move(targetDll, backupDll);
+                            } else {
+                                // If backup exists, we can safely overwrite the target
+                                System.IO.File.Delete(targetDll);
                             }
 
-                            // 2. Copy our proxy (Assuming it's in the same folder as the switcher)
                             string proxySource = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "openvr_api.dll");
                             if (System.IO.File.Exists(proxySource)) {
                                 System.IO.File.Copy(proxySource, targetDll, true);
