@@ -85,8 +85,8 @@ extern "C" MONOEYE_EXPORT XRAPI_ATTR XrResult XRAPI_CALL xrNegotiateLoaderApiLay
     // Fill in our capabilities
     apiLayerRequest->layerInterfaceVersion = XR_CURRENT_LOADER_API_LAYER_VERSION;
     apiLayerRequest->layerApiVersion = XR_CURRENT_API_VERSION;
-    apiLayerRequest->getInstanceProcAddr = monoeye::LayerXrGetInstanceProcAddr;
-    apiLayerRequest->createApiLayerInstance = monoeye::LayerXrCreateApiLayerInstance;
+    apiLayerRequest->getInstanceProcAddr = LayerXrGetInstanceProcAddr;
+    apiLayerRequest->createApiLayerInstance = LayerXrCreateApiLayerInstance;
 
     // Start services and log success now that we're safely outside DllMain
     MONOEYE_LOG("Negotiation successful - interface version: %u, API version: %u",

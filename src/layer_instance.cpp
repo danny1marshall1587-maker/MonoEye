@@ -7,10 +7,12 @@
 #include "config.h"
 #include <cstring>
 #include <new>
+#include <mutex>
 
-namespace monoeye {
+using namespace monoeye;
 
-XrResult XRAPI_CALL LayerXrCreateApiLayerInstance(
+
+extern "C" XRAPI_ATTR XrResult XRAPI_CALL LayerXrCreateApiLayerInstance(
     const XrInstanceCreateInfo* info,
     const XrApiLayerCreateInfo* apiLayerInfo,
     XrInstance* instance
@@ -143,16 +145,14 @@ XrResult XRAPI_CALL LayerXrCreateApiLayerInstance(
 #endif
 
     {
-        std::lock_guard<std::mutex> lock(g_instance_dispatch_mutex);
-        g_instance_dispatch_map[*instance] = nextDispatch;
+        std::lock_guard<std::mutex> lock(monoeye::g_instance_dispatch_mutex);
+        monoeye::g_instance_dispatch_map[*instance] = nextDispatch;
     }
 
     MONOEYE_LOG("Dispatch table created for instance %p", (void*)(uintptr_t)*instance);
 
     return XR_SUCCESS;
 }
-
-} // namespace monoeye
 
 extern "C" XrResult XRAPI_CALL LayerXrDestroyInstance(XrInstance instance) {
     MONOEYE_LOG("LayerXrDestroyInstance called for instance %p", (void*)(uintptr_t)instance);

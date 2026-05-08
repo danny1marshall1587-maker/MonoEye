@@ -212,7 +212,8 @@ extern "C" XrResult XRAPI_CALL monoeye_xrGetD3D12GraphicsRequirementsKHR(
 }
 #endif
 
-namespace monoeye {
+
+using namespace monoeye;
 
 struct HookedFunction {
     const char* name;
@@ -241,11 +242,11 @@ static const HookedFunction s_hooked_functions[] = {
 #endif
     {"xrEnumerateViewConfigurationViews",   (PFN_xrVoidFunction)monoeye_xrEnumerateViewConfigurationViews},
     {"xrLocateViews",                       (PFN_xrVoidFunction)monoeye_xrLocateViews},
-    {"xrDestroyInstance",                   (PFN_xrVoidFunction)::LayerXrDestroyInstance},
+    {"xrDestroyInstance",                   (PFN_xrVoidFunction)LayerXrDestroyInstance},
     {nullptr, nullptr}
 };
 
-XrResult XRAPI_CALL LayerXrGetInstanceProcAddr(
+extern "C" XRAPI_ATTR XrResult XRAPI_CALL LayerXrGetInstanceProcAddr(
     XrInstance instance,
     const char* name,
     PFN_xrVoidFunction* function
@@ -296,6 +297,3 @@ XrResult XRAPI_CALL LayerXrGetInstanceProcAddr(
     *function = nullptr;
     return XR_ERROR_FUNCTION_UNSUPPORTED;
 }
-
-
-} // namespace monoeye

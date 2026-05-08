@@ -53,12 +53,30 @@
 #include <openxr/openxr_platform.h>
 #include <openxr/openxr_loader_negotiation.h>
 
-// Layer negotiation entry point (must be C-exported)
-extern "C" MONOEYE_EXPORT XrResult xrNegotiateLoaderApiLayerInterface(
-    const XrNegotiateLoaderInfo* loaderInfo,
-    const char* apiLayerName,
-    XrNegotiateApiLayerRequest* apiLayerRequest
-);
+// Layer negotiation entry points (must be C-exported)
+extern "C" {
+    MONOEYE_EXPORT XRAPI_ATTR XrResult XRAPI_CALL xrNegotiateLoaderApiLayerInterface(
+        const XrNegotiateLoaderInfo* loaderInfo,
+        const char* apiLayerName,
+        XrNegotiateApiLayerRequest* apiLayerRequest
+    );
+
+    // Core layer entry points called by the loader via the pointers returned during negotiation
+    XRAPI_ATTR XrResult XRAPI_CALL LayerXrCreateApiLayerInstance(
+        const XrInstanceCreateInfo* info,
+        const XrApiLayerCreateInfo* apiLayerInfo,
+        XrInstance* instance
+    );
+
+    XRAPI_ATTR XrResult XRAPI_CALL LayerXrGetInstanceProcAddr(
+        XrInstance instance,
+        const char* name,
+        PFN_xrVoidFunction* function
+    );
+
+    // Internal layer function called via ProcAddr hook
+    XRAPI_ATTR XrResult XRAPI_CALL LayerXrDestroyInstance(XrInstance instance);
+}
 
 namespace monoeye {
 
@@ -78,25 +96,5 @@ struct SessionState {
 extern PFN_xrGetInstanceProcAddr g_nextGetInstanceProcAddr;
 
 struct InstanceState;
-
-
-} // namespace monoeye
-
-// Internal layer functions (not exported directly)
-XrResult XRAPI_CALL LayerXrDestroyInstance(XrInstance instance);
-
-namespace monoeye {
-
-XrResult LayerXrCreateApiLayerInstance(
-    const XrInstanceCreateInfo* info,
-    const XrApiLayerCreateInfo* apiLayerInfo,
-    XrInstance* instance
-);
-
-XrResult LayerXrGetInstanceProcAddr(
-    XrInstance instance,
-    const char* name,
-    PFN_xrVoidFunction* function
-);
 
 } // namespace monoeye
