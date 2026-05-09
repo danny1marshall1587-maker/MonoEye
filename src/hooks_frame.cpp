@@ -99,6 +99,9 @@ extern "C" XrResult XRAPI_CALL monoeye_xrEndFrame(
         return ((PFN_xrEndFrame)dispatch->xrEndFrame)(session, frameEndInfo);
     }
 
+    // --- PHASE 0 DIAGNOSTIC BYPASS ---
+    // Pass raw textures directly down to verify DX12 interop crash issues
+    return ((PFN_xrEndFrame)dispatch->xrEndFrame)(session, frameEndInfo);
 
     // --- MONOEYE DEPTH WARP PIPELINE ---
     

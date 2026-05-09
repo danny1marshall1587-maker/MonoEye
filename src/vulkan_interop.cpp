@@ -13,7 +13,7 @@ namespace monoeye {
 
 #ifdef _WIN32
 
-HANDLE create_d3d12_shared_handle(ID3D12Resource* resource) {
+HANDLE create_d3d12_shared_handle(ID3D12Resource* resource, ID3D12Resource** outIntermediateResource) {
     HANDLE sharedHandle = nullptr;
     ID3D12Device* device = nullptr;
     resource->GetDevice(IID_PPV_ARGS(&device));
@@ -23,8 +23,30 @@ HANDLE create_d3d12_shared_handle(ID3D12Resource* resource) {
         return nullptr;
     }
 
-    HRESULT hr = device->CreateSharedHandle(
-        resource,
+    D3D12_RESOURCE_DESC desc = resource->GetDesc();
+    desc.Flags |= D3D12_RESOURCE_FLAG_ALLOW_SIMULTANEOUS_ACCESS;
+
+    D3D12_HEAP_PROPERTIES heapProps = {};
+    heapProps.Type = D3D12_HEAP_TYPE_DEFAULT;
+
+    ID3D12Resource* intermediateResource = nullptr;
+    HRESULT hr = device->CreateCommittedResource(
+        &heapProps,
+        D3D12_HEAP_FLAG_SHARED,
+        &desc,
+        D3D12_RESOURCE_STATE_COMMON,
+        nullptr,
+        IID_PPV_ARGS(&intermediateResource)
+    );
+
+    if (FAILED(hr)) {
+        MONOEYE_LOG_ERROR("Failed to create intermediate D3D12 resource: 0x%08X", hr);
+        device->Release();
+        return nullptr;
+    }
+
+    hr = device->CreateSharedHandle(
+        intermediateResource,
         nullptr,
         GENERIC_ALL,
         nullptr,
@@ -35,7 +57,14 @@ HANDLE create_d3d12_shared_handle(ID3D12Resource* resource) {
 
     if (FAILED(hr)) {
         MONOEYE_LOG_ERROR("Failed to create D3D12 shared handle: 0x%08X", hr);
+        intermediateResource->Release();
         return nullptr;
+    }
+
+    if (outIntermediateResource) {
+        *outIntermediateResource = intermediateResource;
+    } else {
+        intermediateResource->Release();
     }
 
     return sharedHandle;
@@ -51,9 +80,18 @@ VkResult import_d3d12_texture_to_vulkan(
     VkImage* outImage,
     VkDeviceMemory* outMemory
 ) {
-    HANDLE sharedHandle = create_d3d12_shared_handle(d3d12Resource);
+    ID3D12Resource* intermediateResource = nullptr;
+    HANDLE sharedHandle = create_d3d12_shared_handle(d3d12Resource, &intermediateResource);
     if (!sharedHandle) {
         return VK_ERROR_INITIALIZATION_FAILED;
+    }
+    
+    // Note: The caller is responsible for copying data from d3d12Resource into intermediateResource
+    // using a D3D12 command list during the render loop. If we don't return intermediateResource,
+    // we leak it here, but since this function is not actively used in Phase 0, we release it for now
+    // to avoid leaks until the full pipeline is implemented.
+    if (intermediateResource) {
+        intermediateResource->Release();
     }
 
     // 1. Create External Vulkan Image

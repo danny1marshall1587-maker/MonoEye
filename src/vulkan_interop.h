@@ -32,9 +32,9 @@ VkResult import_d3d12_texture_to_vulkan(
 );
 
 /**
- * @brief Creates a shared handle from a D3D12 resource.
+ * @brief Creates a shared handle from a D3D12 resource by creating an intermediate texture.
  */
-HANDLE create_d3d12_shared_handle(ID3D12Resource* resource);
+HANDLE create_d3d12_shared_handle(ID3D12Resource* resource, ID3D12Resource** outIntermediateResource);
 
 #endif
 

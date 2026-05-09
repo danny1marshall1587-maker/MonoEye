@@ -87,62 +87,20 @@ extern "C" XRAPI_ATTR XrResult XRAPI_CALL LayerXrCreateApiLayerInstance(
         return XR_ERROR_INITIALIZATION_FAILED;
     }
 
-    // Build a minimal dispatch table by resolving ONLY the functions MonoEye
-    // actually calls internally. We deliberately do NOT call GeneratedXrPopulateDispatchTable
-    // as it enumerates 500+ extension functions, each of which triggers a log line
-    // and can cause feedback loops through the layer chain.
+    // Build the full dispatch table using the auto-generated function
+    // to ensure all downstream extensions are captured correctly,
+    // avoiding null pointers on unhooked queries.
     auto* nextDispatch = new (std::nothrow) XrGeneratedDispatchTable();
     if (!nextDispatch) {
         MONOEYE_LOG_ERROR("Failed to allocate dispatch table");
         return XR_ERROR_OUT_OF_MEMORY;
     }
 
-    // Zero-initialise then resolve only what we need
     *nextDispatch = {};
     nextDispatch->nextGetInstanceProcAddr = nextGetInstanceProcAddr;
 
-    // Core functions MonoEye hooks call through to downstream
-    nextGetInstanceProcAddr(*instance, "xrDestroyInstance",
-        (PFN_xrVoidFunction*)&nextDispatch->xrDestroyInstance);
-    nextGetInstanceProcAddr(*instance, "xrCreateSession",
-        (PFN_xrVoidFunction*)&nextDispatch->xrCreateSession);
-    nextGetInstanceProcAddr(*instance, "xrDestroySession",
-        (PFN_xrVoidFunction*)&nextDispatch->xrDestroySession);
-    nextGetInstanceProcAddr(*instance, "xrEnumerateViewConfigurationViews",
-        (PFN_xrVoidFunction*)&nextDispatch->xrEnumerateViewConfigurationViews);
-    nextGetInstanceProcAddr(*instance, "xrLocateViews",
-        (PFN_xrVoidFunction*)&nextDispatch->xrLocateViews);
-    nextGetInstanceProcAddr(*instance, "xrCreateSwapchain",
-        (PFN_xrVoidFunction*)&nextDispatch->xrCreateSwapchain);
-    nextGetInstanceProcAddr(*instance, "xrDestroySwapchain",
-        (PFN_xrVoidFunction*)&nextDispatch->xrDestroySwapchain);
-    nextGetInstanceProcAddr(*instance, "xrEnumerateSwapchainImages",
-        (PFN_xrVoidFunction*)&nextDispatch->xrEnumerateSwapchainImages);
-    nextGetInstanceProcAddr(*instance, "xrAcquireSwapchainImage",
-        (PFN_xrVoidFunction*)&nextDispatch->xrAcquireSwapchainImage);
-    nextGetInstanceProcAddr(*instance, "xrWaitSwapchainImage",
-        (PFN_xrVoidFunction*)&nextDispatch->xrWaitSwapchainImage);
-    nextGetInstanceProcAddr(*instance, "xrReleaseSwapchainImage",
-        (PFN_xrVoidFunction*)&nextDispatch->xrReleaseSwapchainImage);
-    nextGetInstanceProcAddr(*instance, "xrBeginFrame",
-        (PFN_xrVoidFunction*)&nextDispatch->xrBeginFrame);
-    nextGetInstanceProcAddr(*instance, "xrEndFrame",
-        (PFN_xrVoidFunction*)&nextDispatch->xrEndFrame);
-    nextGetInstanceProcAddr(*instance, "xrGetVulkanGraphicsRequirements2KHR",
-        (PFN_xrVoidFunction*)&nextDispatch->xrGetVulkanGraphicsRequirements2KHR);
-    nextGetInstanceProcAddr(*instance, "xrGetVulkanGraphicsRequirementsKHR",
-        (PFN_xrVoidFunction*)&nextDispatch->xrGetVulkanGraphicsRequirementsKHR);
-    nextGetInstanceProcAddr(*instance, "xrGetVulkanGraphicsDevice2KHR",
-        (PFN_xrVoidFunction*)&nextDispatch->xrGetVulkanGraphicsDevice2KHR);
-    nextGetInstanceProcAddr(*instance, "xrGetVulkanGraphicsDeviceKHR",
-        (PFN_xrVoidFunction*)&nextDispatch->xrGetVulkanGraphicsDeviceKHR);
-
-#ifdef _WIN32
-    nextGetInstanceProcAddr(*instance, "xrGetD3D11GraphicsRequirementsKHR",
-        (PFN_xrVoidFunction*)&nextDispatch->xrGetD3D11GraphicsRequirementsKHR);
-    nextGetInstanceProcAddr(*instance, "xrGetD3D12GraphicsRequirementsKHR",
-        (PFN_xrVoidFunction*)&nextDispatch->xrGetD3D12GraphicsRequirementsKHR);
-#endif
+    // Fully populate the dispatch table to prevent AC Evo initialization crashes
+    monoeye::GeneratedXrPopulateDispatchTable(nextDispatch, *instance, nextGetInstanceProcAddr);
 
     {
         std::lock_guard<std::mutex> lock(monoeye::g_instance_dispatch_mutex);
