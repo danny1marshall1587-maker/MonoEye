@@ -162,6 +162,94 @@ VkResult import_d3d12_texture_to_vulkan(
     return VK_SUCCESS;
 }
 
+VkResult create_shared_fence(
+    VkDevice device,
+    ID3D12Device* d3d12Device,
+    ID3D12Fence** outD3D12Fence,
+    HANDLE* outSharedHandle,
+    VkSemaphore* outVulkanSemaphore
+) {
+    if (!device || !d3d12Device || !outD3D12Fence || !outSharedHandle || !outVulkanSemaphore) {
+        return VK_ERROR_INITIALIZATION_FAILED;
+    }
+
+    HRESULT hr = d3d12Device->CreateFence(0, D3D12_FENCE_FLAG_SHARED, IID_PPV_ARGS(outD3D12Fence));
+    if (FAILED(hr)) {
+        MONOEYE_LOG_ERROR("Failed to create D3D12 fence: 0x%08X", hr);
+        return VK_ERROR_INITIALIZATION_FAILED;
+    }
+
+    hr = d3d12Device->CreateSharedHandle(
+        *outD3D12Fence,
+        nullptr,
+        GENERIC_ALL,
+        nullptr,
+        outSharedHandle
+    );
+
+    if (FAILED(hr)) {
+        MONOEYE_LOG_ERROR("Failed to create shared handle for D3D12 fence: 0x%08X", hr);
+        (*outD3D12Fence)->Release();
+        *outD3D12Fence = nullptr;
+        return VK_ERROR_INITIALIZATION_FAILED;
+    }
+
+    VkExportSemaphoreCreateInfo exportInfo = {};
+    exportInfo.sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO;
+    exportInfo.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT;
+
+    VkSemaphoreTypeCreateInfo timelineCreateInfo = {};
+    timelineCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
+    timelineCreateInfo.pNext = &exportInfo;
+    timelineCreateInfo.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
+    timelineCreateInfo.initialValue = 0;
+
+    VkSemaphoreCreateInfo semInfo = {};
+    semInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    semInfo.pNext = &timelineCreateInfo;
+
+    VkResult res = vkCreateSemaphore(device, &semInfo, nullptr, outVulkanSemaphore);
+    if (res != VK_SUCCESS) {
+        MONOEYE_LOG_ERROR("Failed to create Vulkan semaphore for external fence: %d", res);
+        CloseHandle(*outSharedHandle);
+        (*outD3D12Fence)->Release();
+        *outD3D12Fence = nullptr;
+        return res;
+    }
+
+    VkImportSemaphoreWin32HandleInfoKHR importInfo = {};
+    importInfo.sType = VK_STRUCTURE_TYPE_IMPORT_SEMAPHORE_WIN32_HANDLE_INFO_KHR;
+    importInfo.semaphore = *outVulkanSemaphore;
+    importInfo.flags = 0;
+    importInfo.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT;
+    importInfo.handle = *outSharedHandle;
+    importInfo.name = nullptr;
+
+    auto pfnImportSemaphoreWin32HandleKHR = (PFN_vkImportSemaphoreWin32HandleKHR)
+        vkGetDeviceProcAddr(device, "vkImportSemaphoreWin32HandleKHR");
+
+    if (!pfnImportSemaphoreWin32HandleKHR) {
+        MONOEYE_LOG_ERROR("vkImportSemaphoreWin32HandleKHR not found");
+        vkDestroySemaphore(device, *outVulkanSemaphore, nullptr);
+        CloseHandle(*outSharedHandle);
+        (*outD3D12Fence)->Release();
+        *outD3D12Fence = nullptr;
+        return VK_ERROR_INITIALIZATION_FAILED;
+    }
+
+    res = pfnImportSemaphoreWin32HandleKHR(device, &importInfo);
+    if (res != VK_SUCCESS) {
+        MONOEYE_LOG_ERROR("Failed to import D3D12 fence handle to Vulkan semaphore: %d", res);
+        vkDestroySemaphore(device, *outVulkanSemaphore, nullptr);
+        CloseHandle(*outSharedHandle);
+        (*outD3D12Fence)->Release();
+        *outD3D12Fence = nullptr;
+        return res;
+    }
+
+    return VK_SUCCESS;
+}
+
 #endif
 
 } // namespace monoeye

@@ -36,6 +36,17 @@ VkResult import_d3d12_texture_to_vulkan(
  */
 HANDLE create_d3d12_shared_handle(ID3D12Resource* resource, ID3D12Resource** outIntermediateResource);
 
+/**
+ * @brief Creates a D3D12 fence and a Vulkan semaphore that are linked.
+ */
+VkResult create_shared_fence(
+    VkDevice device,
+    ID3D12Device* d3d12Device,
+    ID3D12Fence** outD3D12Fence,
+    HANDLE* outSharedHandle,
+    VkSemaphore* outVulkanSemaphore
+);
+
 #endif
 
 } // namespace monoeye

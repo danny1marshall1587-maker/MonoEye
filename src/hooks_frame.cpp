@@ -8,6 +8,7 @@
 #include "warp_pipeline.h"
 #include "config.h"
 #include "overlay_manager.h"
+#include "vulkan_interop.h"
 
 #include <vector>
 #include <mutex>
@@ -72,6 +73,12 @@ extern "C" XrResult XRAPI_CALL monoeye_xrEndFrame(
 ) {
     const Config& config = get_config();
 
+    SessionType sessionType = SESSION_UNKNOWN;
+#ifdef _WIN32
+    ID3D12Device* d3d12_device = nullptr;
+    ID3D12CommandQueue* d3d12_queue = nullptr;
+#endif
+
     // Find the instance for this session
     XrInstance instance = XR_NULL_HANDLE;
     {
@@ -79,6 +86,11 @@ extern "C" XrResult XRAPI_CALL monoeye_xrEndFrame(
         auto it = s_session_map.find(session);
         if (it != s_session_map.end()) {
             instance = it->second.instance;
+            sessionType = it->second.type;
+#ifdef _WIN32
+            d3d12_device = it->second.d3d12_device;
+            d3d12_queue = it->second.d3d12_queue;
+#endif
         }
     }
 
@@ -99,9 +111,36 @@ extern "C" XrResult XRAPI_CALL monoeye_xrEndFrame(
         return ((PFN_xrEndFrame)dispatch->xrEndFrame)(session, frameEndInfo);
     }
 
-    // --- PHASE 0 DIAGNOSTIC BYPASS ---
-    // Pass raw textures directly down to verify DX12 interop crash issues
-    return ((PFN_xrEndFrame)dispatch->xrEndFrame)(session, frameEndInfo);
+#ifdef _WIN32
+    static thread_local ID3D12Device* s_lastDevice = nullptr;
+    static thread_local ID3D12Fence* s_d3d12Fence = nullptr;
+    static thread_local VkSemaphore s_vulkanSemaphore = VK_NULL_HANDLE;
+    static thread_local HANDLE s_sharedHandle = nullptr;
+
+    if (sessionType == SESSION_D3D12 && d3d12_device && d3d12_queue) {
+        if (s_lastDevice != d3d12_device) {
+            if (s_vulkanSemaphore) {
+                vkDestroySemaphore(WarpPipeline::get_instance().get_vk_device(), s_vulkanSemaphore, nullptr);
+                s_vulkanSemaphore = VK_NULL_HANDLE;
+            }
+            if (s_sharedHandle) {
+                CloseHandle(s_sharedHandle);
+                s_sharedHandle = nullptr;
+            }
+            if (s_d3d12Fence) {
+                s_d3d12Fence->Release();
+                s_d3d12Fence = nullptr;
+            }
+            s_lastDevice = d3d12_device;
+            
+            if (WarpPipeline::get_instance().is_initialized()) {
+                create_shared_fence(WarpPipeline::get_instance().get_vk_device(), d3d12_device, &s_d3d12Fence, &s_sharedHandle, &s_vulkanSemaphore);
+            }
+        }
+    }
+#endif
+
+
 
     // --- MONOEYE DEPTH WARP PIPELINE ---
     
@@ -172,9 +211,18 @@ extern "C" XrResult XRAPI_CALL monoeye_xrEndFrame(
                         SwapchainImageInfo* rightInfo = SwapchainTracker::get_instance().get_info(rightSwapchain);
                         
                         if (rightInfo) {
-                            // Temporarily disabled for DX12 interop diagnosis
-                            // WarpPipeline::get_instance().execute_warp(
-                            //    leftInfo, leftDepthInfo, leftMotionInfo, rightInfo, frameEndInfo->displayTime);
+                            VkSemaphore externalSem = VK_NULL_HANDLE;
+#ifdef _WIN32
+                            if (sessionType == SESSION_D3D12 && s_vulkanSemaphore) {
+                                // Since we reuse a timeline semaphore, we signal value 1 each time
+                                // But timeline semaphores must strictly increase. 
+                                // Actually, if we just signal it to 1, wait for 1, then reset it to 0 in D3D12, that works!
+                                // Wait, D3D12 Signal(0) resets it.
+                                externalSem = s_vulkanSemaphore;
+                            }
+#endif
+                            WarpPipeline::get_instance().execute_warp(
+                               leftInfo, leftDepthInfo, leftMotionInfo, rightInfo, frameEndInfo->displayTime, externalSem);
                         }
                     }
                 }
@@ -205,6 +253,16 @@ extern "C" XrResult XRAPI_CALL monoeye_xrEndFrame(
     XrFrameEndInfo modifiedFrameEndInfo = *frameEndInfo;
     modifiedFrameEndInfo.layerCount = (uint32_t)modifiedLayers.size();
     modifiedFrameEndInfo.layers = modifiedLayers.data();
+
+#ifdef _WIN32
+    if (sessionType == SESSION_D3D12 && s_d3d12Fence && d3d12_queue) {
+        // Wait on the D3D12 command queue for the Vulkan compute shader to signal the fence (value 1)
+        d3d12_queue->Wait(s_d3d12Fence, 1);
+        
+        // Reset the fence back to 0 for the next frame
+        d3d12_queue->Signal(s_d3d12Fence, 0);
+    }
+#endif
 
     g_frame_count.fetch_add(1, std::memory_order_relaxed);
     return ((PFN_xrEndFrame)dispatch->xrEndFrame)(session, &modifiedFrameEndInfo);

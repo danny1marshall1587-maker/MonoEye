@@ -90,6 +90,10 @@ enum SessionType {
 struct SessionState {
     XrInstance instance;
     SessionType type;
+#ifdef _WIN32
+    ID3D12Device* d3d12_device = nullptr;
+    ID3D12CommandQueue* d3d12_queue = nullptr;
+#endif
 };
 
 // Global next GetInstanceProcAddr for NULL-instance calls

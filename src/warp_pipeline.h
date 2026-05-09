@@ -38,7 +38,8 @@ public:
         SwapchainImageInfo* leftDepth,
         SwapchainImageInfo* leftMotion,
         SwapchainImageInfo* rightColor,
-        XrTime displayTime
+        XrTime displayTime,
+        VkSemaphore externalSemaphore = VK_NULL_HANDLE
     );
 
     // Wait for any pending warp operations to complete
@@ -83,7 +84,8 @@ private:
         VkImageView leftMotionView,
         VkImageView rightColorView,
         uint32_t width,
-        uint32_t height
+        uint32_t height,
+        VkSemaphore externalSemaphore
     );
     
     // Ensure temporal buffer is allocated and matches dimensions

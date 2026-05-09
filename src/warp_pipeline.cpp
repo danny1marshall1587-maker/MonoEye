@@ -388,7 +388,8 @@ VkResult WarpPipeline::execute_warp(
     SwapchainImageInfo* leftDepth,
     SwapchainImageInfo* leftMotion,
     SwapchainImageInfo* rightColor,
-    XrTime displayTime
+    XrTime displayTime,
+    VkSemaphore externalSemaphore
 ) {
     (void)displayTime; // Future: use for temporal reprojection
 
@@ -526,7 +527,7 @@ VkResult WarpPipeline::execute_warp(
     }
 
     // Record and submit the compute command
-    VkResult result = record_compute_command(leftColorView, leftEyeDepthView, leftMotionView, rightColorView, width, height);
+    VkResult result = record_compute_command(leftColorView, leftEyeDepthView, leftMotionView, rightColorView, width, height, externalSemaphore);
 
     return result;
 }
@@ -537,7 +538,8 @@ VkResult WarpPipeline::record_compute_command(
     VkImageView leftMotionView,
     VkImageView rightColorView,
     uint32_t width,
-    uint32_t height
+    uint32_t height,
+    VkSemaphore externalSemaphore
 ) {
     (void)leftColorView;
     (void)leftEyeDepthView;
@@ -596,13 +598,29 @@ VkResult WarpPipeline::record_compute_command(
         return result;
     }
 
-    // Submit to the queue
+    std::vector<VkSemaphore> waitSemaphores;
+    std::vector<VkSemaphore> signalSemaphores = {m_completionSemaphore};
+    std::vector<uint64_t> signalValues = {0};
+
+    if (externalSemaphore != VK_NULL_HANDLE) {
+        signalSemaphores.push_back(externalSemaphore);
+        signalValues.push_back(1); // Signal fence to 1
+    }
+
+    VkTimelineSemaphoreSubmitInfo timelineInfo = {};
+    timelineInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
+    timelineInfo.signalSemaphoreValueCount = (uint32_t)signalValues.size();
+    timelineInfo.pSignalSemaphoreValues = signalValues.data();
+
     VkSubmitInfo submitInfo = {};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    if (externalSemaphore != VK_NULL_HANDLE) {
+        submitInfo.pNext = &timelineInfo;
+    }
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &m_commandBuffer;
-    submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pSignalSemaphores = &m_completionSemaphore;
+    submitInfo.signalSemaphoreCount = (uint32_t)signalSemaphores.size();
+    submitInfo.pSignalSemaphores = signalSemaphores.data();
 
     // Reset fence before submit
     vkResetFences(m_vkDevice, 1, &m_fence);

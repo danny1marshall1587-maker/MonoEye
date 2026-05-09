@@ -73,6 +73,9 @@ monoeye_xrCreateSession(XrInstance instance,
           break;
         } else if (header->type == XR_TYPE_GRAPHICS_BINDING_D3D12_KHR) {
           state.type = SESSION_D3D12;
+          const XrGraphicsBindingD3D12KHR *db = reinterpret_cast<const XrGraphicsBindingD3D12KHR *>(header);
+          state.d3d12_device = db->device;
+          state.d3d12_queue = db->queue;
           MONOEYE_LOG("DirectX 12 session detected (AC Evo / Modern DX12)");
           break;
         }
