@@ -3,9 +3,11 @@
 
 #include "overlay_manager.h"
 #include "warp_pipeline.h"
+#include "graphics_manager.h"
 #include "logging.h"
 #include "dispatch_table.h"
 #include "vulkan_utils.h"
+#include "config.h"
 #ifdef _WIN32
 #include <d3d11.h>
 #include <d3d12.h>
@@ -127,8 +129,12 @@ void OverlayManager::initialize(XrInstance instance, XrSession session, VkDevice
     init_info.DescriptorPool = m_descriptorPool;
     init_info.MinImageCount = 2;
     init_info.ImageCount = 2;
-    init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-    ImGui_ImplVulkan_Init(&init_info, m_renderPass);
+    
+    // Updated for latest ImGui version
+    init_info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+    init_info.PipelineInfoMain.RenderPass = m_renderPass;
+    
+    ImGui_ImplVulkan_Init(&init_info);
 
     m_initialized = true;
 }

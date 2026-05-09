@@ -3,6 +3,7 @@
 
 #include "warp_pipeline.h"
 #include "swapchain_tracker.h"
+#include "overlay_manager.h"
 #include "logging.h"
 #include "config.h"
 

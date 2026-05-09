@@ -38,7 +38,7 @@ public:
 
     bool is_initialized() const { return m_initialized; }
 
-    VkInstance get_instance() { return m_instance; }
+    VkInstance get_vk_instance() { return m_instance; }
     VkPhysicalDevice get_physical_device() { return m_physicalDevice; }
     VkDevice get_device() { return m_device; }
     uint32_t get_queue_family() { return m_queueFamily; }
