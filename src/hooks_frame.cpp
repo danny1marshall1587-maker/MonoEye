@@ -169,8 +169,9 @@ extern "C" XrResult XRAPI_CALL monoeye_xrEndFrame(
                         SwapchainImageInfo* rightInfo = SwapchainTracker::get_instance().get_info(rightSwapchain);
                         
                         if (rightInfo) {
-                            WarpPipeline::get_instance().execute_warp(
-                                leftInfo, leftDepthInfo, leftMotionInfo, rightInfo, frameEndInfo->displayTime);
+                            // Temporarily disabled for DX12 interop diagnosis
+                            // WarpPipeline::get_instance().execute_warp(
+                            //    leftInfo, leftDepthInfo, leftMotionInfo, rightInfo, frameEndInfo->displayTime);
                         }
                     }
                 }

@@ -69,6 +69,7 @@ namespace monoeye {
 
 // Static instance of our proxy compositor
 static ProxyCompositor* s_proxyCompositor = nullptr;
+static ProxyCompositor_026* s_proxyCompositor_026 = nullptr;
 static std::mutex s_proxy_mutex;
 
 vr::EVRCompositorError ProxyCompositor::Submit(vr::EVREye eEye, const vr::Texture_t *pTexture, const vr::VRTextureBounds_t* pBounds, vr::EVRSubmitFlags nSubmitFlags) {
@@ -86,6 +87,15 @@ vr::EVRCompositorError ProxyCompositor::Submit(vr::EVREye eEye, const vr::Textur
     // Call the warp pipeline here (Requirement 5/6)
     // ...
 
+    return m_real->Submit(eEye, pTexture, pBounds, nSubmitFlags);
+}
+
+vr::EVRCompositorError ProxyCompositor_026::Submit(vr::EVREye eEye, const vr::Texture_t *pTexture, const vr::VRTextureBounds_t* pBounds, vr::EVRSubmitFlags nSubmitFlags) {
+    static bool s_warp_initialized = false;
+    if (!s_warp_initialized && pTexture) {
+        MONOEYE_LOG("OpenVR Proxy 026: First Submit called, initializing warp pipeline...");
+        s_warp_initialized = true;
+    }
     return m_real->Submit(eEye, pTexture, pBounds, nSubmitFlags);
 }
 
@@ -150,7 +160,15 @@ extern "C" __declspec(dllexport) void* VR_CALLTYPE VR_GetGenericInterface(const 
     if (!iface) return nullptr;
 
     // Wrap the compositor if requested
-    if (strstr(pchInterfaceVersion, "IVRCompositor_")) {
+    if (strcmp(pchInterfaceVersion, "IVRCompositor_026") == 0) {
+        std::lock_guard<std::mutex> lock(monoeye::s_proxy_mutex);
+        if (!monoeye::s_proxyCompositor_026) {
+            MONOEYE_LOG("OpenVR Proxy: Creating strict 026 compositor wrapper for %s", pchInterfaceVersion);
+            monoeye::s_proxyCompositor_026 = new monoeye::ProxyCompositor_026((vr::IVRCompositor*)iface);
+        }
+        return monoeye::s_proxyCompositor_026;
+    }
+    else if (strstr(pchInterfaceVersion, "IVRCompositor_")) {
         std::lock_guard<std::mutex> lock(monoeye::s_proxy_mutex);
         if (!monoeye::s_proxyCompositor) {
             MONOEYE_LOG("OpenVR Proxy: Creating compositor wrapper for %s", pchInterfaceVersion);
