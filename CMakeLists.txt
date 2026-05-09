@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.18)
 project(MonoEye
-    VERSION 0.5.55
+    VERSION 0.5.57
 
     DESCRIPTION "MonoEye - Single-eye VR rendering with depth-based second eye reconstruction"
     LANGUAGES CXX
@@ -183,6 +183,11 @@ if(WIN32)
     )
     target_include_directories(openvr_api PRIVATE external/openvr/headers)
     target_link_libraries(openvr_api PRIVATE Vulkan::Vulkan)
+    target_compile_definitions(openvr_api PRIVATE
+        $<$<PLATFORM_ID:Windows>:VK_USE_PLATFORM_WIN32_KHR>
+        $<$<PLATFORM_ID:Windows>:_CRT_SECURE_NO_WARNINGS>
+        $<$<PLATFORM_ID:Windows>:NOMINMAX>
+    )
     set_target_properties(openvr_api PROPERTIES PREFIX "") # Remove 'lib' prefix
 endif()
 
