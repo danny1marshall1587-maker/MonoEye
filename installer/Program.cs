@@ -162,9 +162,21 @@ namespace MonoEyeInstaller
 
                 // 4. Registry Registration
                 statusLabel.Text = "Registering API Layer...";
-                using (var key = Registry.LocalMachine.CreateSubKey(@"SOFTWARE\Khronos\OpenXR\1\ApiLayers\Implicit"))
+                string[] keys = {
+                    @"SOFTWARE\Khronos\OpenXR\1\ApiLayers\Implicit",
+                    @"SOFTWARE\WOW6432Node\Khronos\OpenXR\1\ApiLayers\Implicit"
+                };
+
+                foreach (string subKey in keys)
                 {
-                    key.SetValue(jsonPath, 0, RegistryValueKind.DWord);
+                    try {
+                        using (var key = Registry.LocalMachine.CreateSubKey(subKey))
+                        {
+                            key.SetValue(jsonPath, 0, RegistryValueKind.DWord);
+                        }
+                    } catch (Exception ex) {
+                        Log($"Warning: Could not write to {subKey}: {ex.Message}");
+                    }
                 }
                 Log("Registry keys created in HKLM.");
                 progressBar.Value = 85;

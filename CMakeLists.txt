@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.18)
 project(MonoEye
-    VERSION 0.5.54
+    VERSION 0.5.55
 
     DESCRIPTION "MonoEye - Single-eye VR rendering with depth-based second eye reconstruction"
     LANGUAGES CXX
@@ -147,6 +147,8 @@ set(MONOEYE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/hooks_view.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/swapchain_tracker.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/warp_pipeline.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/graphics_manager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/vulkan_interop.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/config.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/logging.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/vulkan_utils.cpp
@@ -175,6 +177,8 @@ target_include_directories(monoeye PRIVATE
 if(WIN32)
     add_library(openvr_api SHARED 
         src/openvr_proxy/openvr_proxy.cpp
+        src/graphics_manager.cpp
+        src/vulkan_utils.cpp
         src/logging.cpp
     )
     target_include_directories(openvr_api PRIVATE external/openvr/headers)

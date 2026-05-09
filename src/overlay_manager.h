@@ -45,6 +45,8 @@ public:
     bool is_visible() const { return m_visible; }
     void toggle_visibility() { m_visible = !m_visible; }
 
+    VkImageView get_vulkan_image_view() const { return m_uiView; }
+
 private:
     OverlayManager() = default;
 
@@ -52,18 +54,17 @@ private:
     XrSession m_xrSession = XR_NULL_HANDLE;
     VkInstance m_vkInstance = VK_NULL_HANDLE;
     VkDevice m_vkDevice = VK_NULL_HANDLE;
-    
-#ifdef _WIN32
-    ID3D11Device* m_d3d11Device = nullptr;
-    ID3D11DeviceContext* m_d3d11Context = nullptr;
-    ID3D12Device* m_d3d12Device = nullptr;
-#endif
+    VkPhysicalDevice m_vkPhysicalDevice = VK_NULL_HANDLE;
+    VkQueue m_vkQueue = VK_NULL_HANDLE;
+    uint32_t m_queueFamily = 0;
 
-    SessionType m_sessionType = SESSION_UNKNOWN;
-    
-    XrSwapchain m_swapchain = XR_NULL_HANDLE;
-    std::vector<VkImage> m_images;
-    std::vector<VkImageView> m_imageViews;
+    VkImage m_uiImage = VK_NULL_HANDLE;
+    VkDeviceMemory m_uiMemory = VK_NULL_HANDLE;
+    VkImageView m_uiView = VK_NULL_HANDLE;
+    VkRenderPass m_renderPass = VK_NULL_HANDLE;
+    VkFramebuffer m_framebuffer = VK_NULL_HANDLE;
+    VkCommandPool m_commandPool = VK_NULL_HANDLE;
+    VkCommandBuffer m_commandBuffer = VK_NULL_HANDLE;
     
     VkDescriptorPool m_descriptorPool = VK_NULL_HANDLE;
     

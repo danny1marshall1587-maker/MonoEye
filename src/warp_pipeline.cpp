@@ -30,6 +30,7 @@ struct WarpPushConstants {
     uint32_t frameGenEnabled;
     float upscaleFactor;
     uint32_t frameIndex;
+    uint32_t hasUIOverlay;
 };
 
 WarpPipeline::WarpPipeline() = default;
@@ -242,11 +243,14 @@ void WarpPipeline::shutdown() {
 
 VkResult WarpPipeline::create_descriptor_resources() {
     // Descriptor set layout:
+    // Binding 0: left eye color (sampled image)
+    // Binding 1: left eye depth (sampled image)
     // Binding 2: right eye output (storage image)
     // Binding 3: previous frame (storage image for accumulation)
     // Binding 4: motion vectors (sampled image)
+    // Binding 5: UI overlay (sampled image)
 
-    VkDescriptorSetLayoutBinding bindings[5] = {};
+    VkDescriptorSetLayoutBinding bindings[6] = {};
 
     bindings[0].binding = 0;
     bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
@@ -273,9 +277,14 @@ VkResult WarpPipeline::create_descriptor_resources() {
     bindings[4].descriptorCount = 1;
     bindings[4].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
+    bindings[5].binding = 5;
+    bindings[5].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+    bindings[5].descriptorCount = 1;
+    bindings[5].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
     VkDescriptorSetLayoutCreateInfo layoutInfo = {};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 5;
+    layoutInfo.bindingCount = 6;
     layoutInfo.pBindings = bindings;
 
     VkResult result = vkCreateDescriptorSetLayout(m_vkDevice, &layoutInfo, nullptr, &m_descriptorSetLayout);
@@ -286,7 +295,7 @@ VkResult WarpPipeline::create_descriptor_resources() {
     // Create descriptor pool
     VkDescriptorPoolSize poolSizes[2] = {};
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-    poolSizes[0].descriptorCount = 3; // Color + Depth + Motion
+    poolSizes[0].descriptorCount = 4; // Color + Depth + Motion + UI
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
     poolSizes[1].descriptorCount = 2; // Output + Temporal
 
@@ -496,6 +505,25 @@ VkResult WarpPipeline::execute_warp(
         vkUpdateDescriptorSets(m_vkDevice, 1, &motionWrite, 0, nullptr);
     }
 
+    // REQUIREMENT 6: UI Overlay Binding
+    VkImageView uiView = OverlayManager::get_instance().get_vulkan_image_view();
+    if (uiView != VK_NULL_HANDLE) {
+        VkDescriptorImageInfo uiInfo = {};
+        uiInfo.imageView = uiView;
+        uiInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        uiInfo.sampler = m_sampler;
+
+        VkWriteDescriptorSet uiWrite = {};
+        uiWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        uiWrite.dstSet = m_descriptorSet;
+        uiWrite.dstBinding = 5;
+        uiWrite.descriptorCount = 1;
+        uiWrite.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+        uiWrite.pImageInfo = &uiInfo;
+
+        vkUpdateDescriptorSets(m_vkDevice, 1, &uiWrite, 0, nullptr);
+    }
+
     // Record and submit the compute command
     VkResult result = record_compute_command(leftColorView, leftEyeDepthView, leftMotionView, rightColorView, width, height);
 
@@ -549,6 +577,7 @@ VkResult WarpPipeline::record_compute_command(
     pc.frameGenEnabled = config.frame_gen_enabled ? 1 : 0;
     pc.upscaleFactor = config.render_width_percent / 100.0f;
     pc.frameIndex = s_frame_index++;
+    pc.hasUIOverlay = OverlayManager::get_instance().is_visible() ? 1 : 0;
 
     vkCmdPushConstants(m_commandBuffer, m_pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 
         0, sizeof(WarpPushConstants), &pc);

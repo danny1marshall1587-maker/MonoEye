@@ -549,26 +549,30 @@ namespace MonoEyeSwitcher
             if (enable)
             {
                 string jsonPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "XR_APILAYER_NOVENDOR_monoeye.json");
-                string subKey = @"SOFTWARE\Khronos\OpenXR\1\ApiLayers\Implicit";
+                string[] keys = {
+                    @"SOFTWARE\Khronos\OpenXR\1\ApiLayers\Implicit",
+                    @"SOFTWARE\WOW6432Node\Khronos\OpenXR\1\ApiLayers\Implicit"
+                };
 
-                try
+                foreach (string subKey in keys)
                 {
-                    // Prefer HKLM for stability/EAC compliance
-                    using (RegistryKey key = Registry.LocalMachine.CreateSubKey(subKey))
+                    try
                     {
-                        key.SetValue(jsonPath, 0, RegistryValueKind.DWord);
-                    }
-                }
-                catch (Exception)
-                {
-                    // Fallback to HKCU if no admin
-                    try {
-                        using (RegistryKey key = Registry.CurrentUser.CreateSubKey(subKey))
+                        // Prefer HKLM for stability/EAC compliance
+                        using (RegistryKey key = Registry.LocalMachine.CreateSubKey(subKey))
                         {
                             key.SetValue(jsonPath, 0, RegistryValueKind.DWord);
                         }
-                    } catch (Exception ex) {
-                        MessageBox.Show("Failed to register OpenXR layer: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                    catch (Exception)
+                    {
+                        // Fallback to HKCU if no admin
+                        try {
+                            using (RegistryKey key = Registry.CurrentUser.CreateSubKey(subKey))
+                            {
+                                key.SetValue(jsonPath, 0, RegistryValueKind.DWord);
+                            }
+                        } catch { }
                     }
                 }
             }

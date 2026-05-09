@@ -22,378 +22,212 @@ void OverlayManager::initialize(XrInstance instance, XrSession session, VkDevice
 
     m_xrInstance = instance;
     m_xrSession = session;
-    m_sessionType = SESSION_VULKAN;
     m_vkInstance = WarpPipeline::get_instance().get_vk_instance();
     m_vkDevice = device;
+    m_vkPhysicalDevice = physicalDevice;
+    m_vkQueue = queue;
+    m_queueFamily = queueFamilyIndex;
 
-    // Retrieve dispatch table
-    {
-        std::lock_guard<std::mutex> lock(g_instance_dispatch_mutex);
-        auto it = g_instance_dispatch_map.find(instance);
-        if (it != g_instance_dispatch_map.end()) {
-            m_dispatch = it->second;
-        }
-    }
+    MONOEYE_LOG("Initializing Unified OverlayManager (Vulkan Compute Composite)...");
 
-    if (!m_dispatch) {
-        MONOEYE_LOG_ERROR("Failed to find dispatch table for instance %p", (void*)instance);
-        return;
-    }
+    // 1. Create Internal UI Texture (1024x1024)
+    VkImageCreateInfo imageInfo = {VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
+    imageInfo.imageType = VK_IMAGE_TYPE_2D;
+    imageInfo.extent.width = 1024;
+    imageInfo.extent.height = 1024;
+    imageInfo.extent.depth = 1;
+    imageInfo.mipLevels = 1;
+    imageInfo.arrayLayers = 1;
+    imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+    imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
+    vkCreateImage(m_vkDevice, &imageInfo, nullptr, &m_uiImage);
 
-    MONOEYE_LOG("Initializing OverlayManager...");
+    VkMemoryRequirements memReqs;
+    vkGetImageMemoryRequirements(m_vkDevice, m_uiImage, &memReqs);
 
-    // 1. Create OpenXR Swapchain for UI (1024x1024)
-    XrSwapchainCreateInfo swapchainInfo = {XR_TYPE_SWAPCHAIN_CREATE_INFO};
-    swapchainInfo.usageFlags = XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT | XR_SWAPCHAIN_USAGE_SAMPLED_BIT;
-    swapchainInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
-    swapchainInfo.sampleCount = 1;
-    swapchainInfo.width = 1024;
-    swapchainInfo.height = 1024;
-    swapchainInfo.faceCount = 1;
-    swapchainInfo.arraySize = 1;
-    swapchainInfo.mipCount = 1;
+    VkMemoryAllocateInfo allocInfo = {VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
+    allocInfo.allocationSize = memReqs.size;
+    allocInfo.memoryTypeIndex = find_memory_type(m_vkPhysicalDevice, memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    vkAllocateMemory(m_vkDevice, &allocInfo, nullptr, &m_uiMemory);
+    vkBindImageMemory(m_vkDevice, m_uiImage, m_uiMemory, 0);
 
-    XrResult result = ((PFN_xrCreateSwapchain)m_dispatch->xrCreateSwapchain)(m_xrSession, &swapchainInfo, &m_swapchain);
+    VkImageViewCreateInfo viewInfo = {VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+    viewInfo.image = m_uiImage;
+    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    viewInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+    viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    viewInfo.subresourceRange.levelCount = 1;
+    viewInfo.subresourceRange.layerCount = 1;
+    vkCreateImageView(m_vkDevice, &viewInfo, nullptr, &m_uiView);
 
+    // 2. Create Render Pass & Framebuffer
+    VkAttachmentDescription attachment = {};
+    attachment.format = VK_FORMAT_R8G8B8A8_UNORM;
+    attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    attachment.finalLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
+    VkAttachmentReference colorRef = {0, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
 
-    if (result != XR_SUCCESS) {
-        MONOEYE_LOG_ERROR("Failed to create overlay swapchain: %d", result);
-        return;
-    }
+    VkSubpassDescription subpass = {};
+    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.colorAttachmentCount = 1;
+    subpass.pColorAttachments = &colorRef;
 
-    // 2. Get swapchain images
-    uint32_t imageCount = 0;
-    ((PFN_xrEnumerateSwapchainImages)m_dispatch->xrEnumerateSwapchainImages)(m_swapchain, 0, &imageCount, nullptr);
-    std::vector<XrSwapchainImageVulkanKHR> images(imageCount, {XR_TYPE_SWAPCHAIN_IMAGE_VULKAN_KHR});
-    ((PFN_xrEnumerateSwapchainImages)m_dispatch->xrEnumerateSwapchainImages)(m_swapchain, imageCount, &imageCount, (XrSwapchainImageBaseHeader*)images.data());
+    VkRenderPassCreateInfo rpInfo = {VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO};
+    rpInfo.attachmentCount = 1;
+    rpInfo.pAttachments = &attachment;
+    rpInfo.subpassCount = 1;
+    rpInfo.pSubpasses = &subpass;
+    vkCreateRenderPass(m_vkDevice, &rpInfo, nullptr, &m_renderPass);
 
+    VkFramebufferCreateInfo fbInfo = {VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO};
+    fbInfo.renderPass = m_renderPass;
+    fbInfo.attachmentCount = 1;
+    fbInfo.pAttachments = &m_uiView;
+    fbInfo.width = 1024;
+    fbInfo.height = 1024;
+    fbInfo.layers = 1;
+    vkCreateFramebuffer(m_vkDevice, &fbInfo, nullptr, &m_framebuffer);
 
+    // 3. Create Command Pool & Buffer
+    VkCommandPoolCreateInfo cpInfo = {VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
+    cpInfo.queueFamilyIndex = m_queueFamily;
+    cpInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    vkCreateCommandPool(m_vkDevice, &cpInfo, nullptr, &m_commandPool);
 
+    VkCommandBufferAllocateInfo cbInfo = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+    cbInfo.commandPool = m_commandPool;
+    cbInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    cbInfo.commandBufferCount = 1;
+    vkAllocateCommandBuffers(m_vkDevice, &cbInfo, &m_commandBuffer);
 
-    for (uint32_t i = 0; i < imageCount; ++i) {
-        m_images.push_back(images[i].image);
-        
-        VkImageViewCreateInfo viewInfo = {VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
-        viewInfo.image = images[i].image;
-        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        viewInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
-        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        viewInfo.subresourceRange.levelCount = 1;
-        viewInfo.subresourceRange.layerCount = 1;
-        
-        VkImageView view;
-        vkCreateImageView(m_vkDevice, &viewInfo, nullptr, &view);
-        m_imageViews.push_back(view);
-    }
-
-    // 2. Create Descriptor Pool for ImGui
-    VkDescriptorPoolSize pool_sizes[] = {
-        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1 }
-    };
-    VkDescriptorPoolCreateInfo pool_info = {};
-    pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    // 4. Initialize ImGui
+    VkDescriptorPoolSize pool_sizes[] = {{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1}};
+    VkDescriptorPoolCreateInfo pool_info = {VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO};
     pool_info.maxSets = 1;
-    pool_info.poolSizeCount = (uint32_t)IM_ARRAYSIZE(pool_sizes);
+    pool_info.poolSizeCount = 1;
     pool_info.pPoolSizes = pool_sizes;
     vkCreateDescriptorPool(m_vkDevice, &pool_info, nullptr, &m_descriptorPool);
 
-    // 3. Initialize ImGui
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO();
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-
-    ImGui::StyleColorsDark();
-    
-    // Customize style for VR (high contrast, large text)
-    ImGuiStyle& style = ImGui::GetStyle();
-    style.WindowRounding = 8.0f;
-    style.FrameRounding = 4.0f;
-    style.ScaleAllSizes(2.0f); // Make it big for VR
-
     ImGui_ImplVulkan_InitInfo init_info = {};
     init_info.Instance = m_vkInstance;
-    init_info.PhysicalDevice = physicalDevice;
+    init_info.PhysicalDevice = m_vkPhysicalDevice;
     init_info.Device = m_vkDevice;
-    init_info.QueueFamily = queueFamilyIndex;
-    init_info.Queue = queue;
+    init_info.Queue = m_vkQueue;
     init_info.DescriptorPool = m_descriptorPool;
     init_info.MinImageCount = 2;
-    init_info.ImageCount = (uint32_t)m_images.size();
-    init_info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
-    
-    ImGui_ImplVulkan_Init(&init_info);
-
-    // 4. Initialize Quad Layer info
-    m_quadLayer.type = XR_TYPE_COMPOSITION_LAYER_QUAD;
-    m_quadLayer.next = nullptr;
-    m_quadLayer.layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT;
-    m_quadLayer.space = XR_NULL_HANDLE; 
-    m_quadLayer.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
-    m_quadLayer.subImage.swapchain = m_swapchain;
-    m_quadLayer.subImage.imageRect.offset = {0, 0};
-    m_quadLayer.subImage.imageRect.extent = {1024, 1024};
-    m_quadLayer.subImage.imageArrayIndex = 0;
-    
-    m_quadLayer.pose.orientation = {0, 0, 0, 1};
-    m_quadLayer.pose.position = {0, 0, -1.5f};
-    m_quadLayer.size = {1.0f, 1.0f};
+    init_info.ImageCount = 2;
+    init_info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+    ImGui_ImplVulkan_Init(&init_info, m_renderPass);
 
     m_initialized = true;
-    m_visible = false; 
 }
 
 #ifdef _WIN32
 void OverlayManager::initializeD3D11(XrInstance instance, XrSession session, ID3D11Device* device) {
-    if (m_initialized) return;
-
-    m_xrInstance = instance;
-    m_xrSession = session;
-    m_sessionType = SESSION_D3D11;
-    m_d3d11Device = device;
-    device->GetImmediateContext(&m_d3d11Context);
-
-    // Retrieve dispatch table
-    {
-        std::lock_guard<std::mutex> lock(g_instance_dispatch_mutex);
-        auto it = g_instance_dispatch_map.find(instance);
-        if (it != g_instance_dispatch_map.end()) {
-            m_dispatch = it->second;
-        }
-    }
-
-    if (!m_dispatch) return;
-
-    MONOEYE_LOG("Initializing OverlayManager (D3D11)...");
-
-    // 1. Create OpenXR Swapchain for UI
-    XrSwapchainCreateInfo swapchainInfo = {XR_TYPE_SWAPCHAIN_CREATE_INFO};
-    swapchainInfo.usageFlags = XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT | XR_SWAPCHAIN_USAGE_SAMPLED_BIT;
-    swapchainInfo.format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    swapchainInfo.sampleCount = 1;
-    swapchainInfo.width = 1024;
-    swapchainInfo.height = 1024;
-    swapchainInfo.faceCount = 1;
-    swapchainInfo.arraySize = 1;
-    swapchainInfo.mipCount = 1;
-
-    XrResult result = ((PFN_xrCreateSwapchain)m_dispatch->xrCreateSwapchain)(m_xrSession, &swapchainInfo, &m_swapchain);
-    if (result != XR_SUCCESS) {
-        MONOEYE_LOG_ERROR("Failed to create overlay swapchain (D3D11): %d", result);
-        return;
-    }
-
-    // 2. Initialize ImGui
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGui_ImplDX11_Init(m_d3d11Device, m_d3d11Context);
-
-    // 3. Initialize Quad Layer info (same as Vulkan)
-    m_quadLayer.type = XR_TYPE_COMPOSITION_LAYER_QUAD;
-    m_quadLayer.next = nullptr;
-    m_quadLayer.layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT;
-    m_quadLayer.space = XR_NULL_HANDLE; 
-    m_quadLayer.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
-    m_quadLayer.subImage.swapchain = m_swapchain;
-    m_quadLayer.subImage.imageRect.offset = {0, 0};
-    m_quadLayer.subImage.imageRect.extent = {1024, 1024};
-    m_quadLayer.subImage.imageArrayIndex = 0;
-    
-    m_quadLayer.pose.orientation = {0, 0, 0, 1};
-    m_quadLayer.pose.position = {0, 0, -1.5f};
-    m_quadLayer.size = {1.0f, 1.0f};
-
-    m_initialized = true;
-    m_visible = false;
+    // We now use unified Vulkan UI via GraphicsManager
+    GraphicsManager::get_instance().ensure_initialized();
+    initialize(instance, session, 
+        GraphicsManager::get_instance().get_device(),
+        GraphicsManager::get_instance().get_physical_device(),
+        GraphicsManager::get_instance().get_queue_family(),
+        GraphicsManager::get_instance().get_queue());
 }
 
 void OverlayManager::initializeD3D12(XrInstance instance, XrSession session, ID3D12Device* device, ID3D12CommandQueue* queue) {
-    // Similar to D3D11, stubbed for now
-    m_sessionType = SESSION_D3D12;
-    MONOEYE_LOG("OverlayManager (D3D12) initialized (stub)");
+    initializeD3D11(instance, session, nullptr);
 }
 #endif
 
 void OverlayManager::shutdown() {
     if (!m_initialized) return;
-
-    for (auto view : m_imageViews) {
-        vkDestroyImageView(m_vkDevice, view, nullptr);
-    }
-    m_imageViews.clear();
-    m_images.clear();
-
-    if (m_swapchain && m_dispatch) {
-        ((PFN_xrDestroySwapchain)m_dispatch->xrDestroySwapchain)(m_swapchain);
-        m_swapchain = XR_NULL_HANDLE;
-    }
-
-#ifdef _WIN32
-    if (m_sessionType == SESSION_D3D11) {
-        ImGui_ImplDX11_Shutdown();
-        if (m_d3d11Context) { m_d3d11Context->Release(); m_d3d11Context = nullptr; }
-        if (m_d3d11Device) { m_d3d11Device->Release(); m_d3d11Device = nullptr; }
-    } else if (m_sessionType == SESSION_D3D12) {
-        ImGui_ImplDX12_Shutdown();
-    }
-#endif
-
-    if (m_sessionType == SESSION_VULKAN) {
-        ImGui_ImplVulkan_Shutdown();
-    }
-
+    vkDeviceWaitIdle(m_vkDevice);
+    
+    ImGui_ImplVulkan_Shutdown();
+    vkDestroyDescriptorPool(m_vkDevice, m_descriptorPool, nullptr);
+    vkDestroyCommandPool(m_vkDevice, m_commandPool, nullptr);
+    vkDestroyFramebuffer(m_vkDevice, m_framebuffer, nullptr);
+    vkDestroyRenderPass(m_vkDevice, m_renderPass, nullptr);
+    vkDestroyImageView(m_vkDevice, m_uiView, nullptr);
+    vkFreeMemory(m_vkDevice, m_uiMemory, nullptr);
+    vkDestroyImage(m_vkDevice, m_uiImage, nullptr);
+    
     m_initialized = false;
 }
-
-void OverlayManager::begin_frame() {
-    if (!m_initialized || !m_visible) return;
-    // ImGui NewFrame logic will go here
-}
-
-#ifdef _WIN32
-#include <windows.h>
-#endif
-
 
 void OverlayManager::end_frame(XrTime displayTime) {
     if (!m_initialized) return;
 
-    // 1. Handle Keyboard Input
+    // Handle Hotkey (HOME)
     static bool homeWasDown = false;
-    bool homeIsDown = false;
 #ifdef _WIN32
-    homeIsDown = (GetAsyncKeyState(VK_HOME) & 0x8000) != 0;
-#endif
-
-    
-    if (homeIsDown && !homeWasDown) {
-        m_visible = !m_visible;
-        MONOEYE_LOG("Overlay visibility toggled: %s", m_visible ? "ON" : "OFF");
-    }
+    bool homeIsDown = (GetAsyncKeyState(VK_HOME) & 0x8000) != 0;
+    if (homeIsDown && !homeWasDown) m_visible = !m_visible;
     homeWasDown = homeIsDown;
+#endif
 
     if (!m_visible) return;
 
-    // 2. Handle Menu Navigation (Arrows)
-    if (m_visible) {
-        static float lastKeyTime = 0;
-        float currentTime = (float)displayTime / 1e9f;
-        
-        if (currentTime - lastKeyTime > 0.15f) { // Cooldown for keys
-            bool upPressed = false;
-            bool downPressed = false;
-            bool leftPressed = false;
-            bool rightPressed = false;
-#ifdef _WIN32
-            upPressed = (GetAsyncKeyState(VK_UP) & 0x8000) != 0;
-            downPressed = (GetAsyncKeyState(VK_DOWN) & 0x8000) != 0;
-            leftPressed = (GetAsyncKeyState(VK_LEFT) & 0x8000) != 0;
-            rightPressed = (GetAsyncKeyState(VK_RIGHT) & 0x8000) != 0;
-#endif
-
-
-            if (upPressed) { m_menuIndex = (m_menuIndex - 1 + 4) % 4; lastKeyTime = currentTime; }
-            if (downPressed) { m_menuIndex = (m_menuIndex + 1) % 4; lastKeyTime = currentTime; }
-            
-            // Left/Right to adjust values (Placeholder logic)
-            if (leftPressed) { /* Decrease current setting */ lastKeyTime = currentTime; }
-            if (rightPressed) { /* Increase current setting */ lastKeyTime = currentTime; }
-        }
-    }
-
-    // 3. Render ImGui Menu
-    if (m_sessionType == SESSION_VULKAN) {
-        ImGui_ImplVulkan_NewFrame();
-    }
-#ifdef _WIN32
-    else if (m_sessionType == SESSION_D3D11) {
-        ImGui_ImplDX11_NewFrame();
-    }
-#endif
+    ImGui_ImplVulkan_NewFrame();
     ImGui::NewFrame();
 
-    ImGui::SetNextWindowPos(ImVec2(100, 100));
-    ImGui::SetNextWindowSize(ImVec2(824, 824));
-    ImGui::Begin("MonoEye Universal Suite v0.4.0", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground);
+    // UI Layout
+    ImGui::SetNextWindowPos(ImVec2(50, 50), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2(924, 924));
+    ImGui::Begin("MonoEye Control Panel", nullptr, ImGuiWindowFlags_NoDecoration);
     
-    ImGui::TextColored(ImVec4(0, 1, 1, 1), "MONOEYE ADVANCED CLARITY");
+    ImGui::TextColored(ImVec4(0, 1, 1, 1), "MONOEYE RECONSTRUCTION v0.6.0");
     ImGui::Separator();
+    
+    const Config& config = get_config();
+    ImGui::Text("Status: %s", config.enabled ? "ACTIVE" : "BYPASS");
+    ImGui::Text("Quality: %s", config.warp_quality == 2 ? "Ultra (Bilateral)" : "Standard");
+    
     ImGui::Spacing();
-
-    const char* options[] = { "FSR Scaling", "Specular Rejection", "Edge Smoothing", "Performance HUD" };
-    for (int i = 0; i < 4; i++) {
-        if (i == m_menuIndex) {
-            ImGui::TextColored(ImVec4(1, 1, 0, 1), "> %s", options[i]);
-            
-            // Handle Toggle for HUD
-            if (i == 3) {
-                bool rightPressed = false;
-                bool leftPressed = false;
-#ifdef _WIN32
-                rightPressed = (GetAsyncKeyState(VK_RIGHT) & 0x8000) != 0;
-                leftPressed = (GetAsyncKeyState(VK_LEFT) & 0x8000) != 0;
-#endif
-                if (rightPressed) m_showHud = true;
-                if (leftPressed) m_showHud = false;
-            }
-        } else {
-            ImGui::Text("  %s", options[i]);
-        }
-    }
-
+    ImGui::TextColored(ImVec4(1, 1, 0, 1), "PERFORMANCE METRICS");
+    ImGui::Text("Frame Time: %.2f ms", m_metrics.frameTimeMs);
+    ImGui::Text("GPU Savings: %.1f%%", m_metrics.gpuSavings);
     
     ImGui::End();
-
-    // 4. Render Performance HUD (Always on if enabled)
-    if (m_showHud) {
-        ImGui::SetNextWindowPos(ImVec2(10, 10));
-        ImGui::Begin("Performance HUD", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoBackground);
-        
-        static float lastTime = 0;
-        float currentTime = (float)displayTime / 1e9f;
-        m_metrics.frameTimeMs = (currentTime - lastTime) * 1000.0f;
-        lastTime = currentTime;
-
-        ImGui::TextColored(ImVec4(0, 1, 0, 1), "GPU SAVINGS: %.1f%%", m_metrics.gpuSavings);
-        ImGui::Text("FRAME TIME: %.2f ms", m_metrics.frameTimeMs);
-        ImGui::Text("RENDER LOAD: %.1f%%", (m_metrics.frameTimeMs / 11.1f) * 100.0f); // Assuming 90Hz target
-        
-        ImGui::End();
-    }
-
     ImGui::Render();
 
-    // 4. Acquire swapchain image and record draw commands
-    uint32_t imageIndex;
-    ((PFN_xrAcquireSwapchainImage)m_dispatch->xrAcquireSwapchainImage)(m_swapchain, nullptr, &imageIndex);
+    // Record Vulkan Commands
+    VkCommandBufferBeginInfo beginInfo = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    vkBeginCommandBuffer(m_commandBuffer, &beginInfo);
 
-    
-    XrSwapchainImageWaitInfo waitInfo = {XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO};
-    waitInfo.timeout = XR_INFINITE_DURATION;
-    ((PFN_xrWaitSwapchainImage)m_dispatch->xrWaitSwapchainImage)(m_swapchain, &waitInfo);
+    VkRenderPassBeginInfo rpBegin = {VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO};
+    rpBegin.renderPass = m_renderPass;
+    rpBegin.framebuffer = m_framebuffer;
+    rpBegin.renderArea.extent = {1024, 1024};
+    VkClearValue clearColor = {{{0.0f, 0.0f, 0.0f, 0.0f}}};
+    rpBegin.clearValueCount = 1;
+    rpBegin.pClearValues = &clearColor;
 
-    
-    if (m_sessionType == SESSION_VULKAN) {
-        // Vulkan rendering already implemented
-    }
-#ifdef _WIN32
-    else if (m_sessionType == SESSION_D3D11) {
-        ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
-    }
-#endif
+    vkCmdBeginRenderPass(m_commandBuffer, &rpBegin, VK_SUBPASS_CONTENTS_INLINE);
+    ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), m_commandBuffer);
+    vkCmdEndRenderPass(m_commandBuffer);
 
-    ((PFN_xrReleaseSwapchainImage)m_dispatch->xrReleaseSwapchainImage)(m_swapchain, nullptr);
+    vkEndCommandBuffer(m_commandBuffer);
 
-
-
+    VkSubmitInfo submitInfo = {VK_STRUCTURE_TYPE_SUBMIT_INFO};
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &m_commandBuffer;
+    vkQueueSubmit(m_vkQueue, 1, &submitInfo, VK_NULL_HANDLE);
 }
 
 const XrCompositionLayerBaseHeader* OverlayManager::get_composition_layer() {
-    if (!m_initialized || !m_visible) return nullptr;
-    return reinterpret_cast<const XrCompositionLayerBaseHeader*>(&m_quadLayer);
+    return nullptr; // No separate layer, handled in compute
 }
 
 } // namespace monoeye

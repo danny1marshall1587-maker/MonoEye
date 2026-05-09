@@ -62,6 +62,13 @@ extern "C" XrResult XRAPI_CALL monoeye_xrDestroySwapchain(
     XrSwapchain swapchain
 );
 
+extern "C" XrResult XRAPI_CALL monoeye_xrLocateSpace(
+    XrSpace space,
+    XrSpace baseSpace,
+    XrTime time,
+    XrSpaceLocation* location
+);
+
 extern "C" XRAPI_ATTR XrResult XRAPI_CALL LayerXrDestroyInstance(
     XrInstance instance
 );
@@ -243,6 +250,7 @@ static const HookedFunction s_hooked_functions[] = {
     {"xrEnumerateViewConfigurationViews",   (PFN_xrVoidFunction)monoeye_xrEnumerateViewConfigurationViews},
     {"xrLocateViews",                       (PFN_xrVoidFunction)monoeye_xrLocateViews},
     {"xrDestroyInstance",                   (PFN_xrVoidFunction)LayerXrDestroyInstance},
+    {"xrLocateSpace",                       (PFN_xrVoidFunction)monoeye_xrLocateSpace},
     {nullptr, nullptr}
 };
 
@@ -280,7 +288,11 @@ extern "C" XRAPI_ATTR XrResult XRAPI_CALL LayerXrGetInstanceProcAddr(
 
         if (dispatch && dispatch->nextGetInstanceProcAddr) {
             MONOEYE_LOG_DEBUG("  -> forwarding to instance nextGetInstanceProcAddr");
-            return dispatch->nextGetInstanceProcAddr(instance, name, function);
+            XrResult res = dispatch->nextGetInstanceProcAddr(instance, name, function);
+            if (res == XR_SUCCESS && *function == nullptr) {
+                return XR_ERROR_FUNCTION_UNSUPPORTED;
+            }
+            return res;
         }
     }
 
@@ -288,7 +300,11 @@ extern "C" XRAPI_ATTR XrResult XRAPI_CALL LayerXrGetInstanceProcAddr(
     // if the instance isn't in our map yet).
     if (monoeye::g_nextGetInstanceProcAddr) {
         MONOEYE_LOG_DEBUG("  -> forwarding to global g_nextGetInstanceProcAddr");
-        return monoeye::g_nextGetInstanceProcAddr(instance, name, function);
+        XrResult res = monoeye::g_nextGetInstanceProcAddr(instance, name, function);
+        if (res == XR_SUCCESS && *function == nullptr) {
+            return XR_ERROR_FUNCTION_UNSUPPORTED;
+        }
+        return res;
     }
 
     MONOEYE_LOG_ERROR("xrGetInstanceProcAddr: no downstream handler for '%s' (instance: %p). "

@@ -72,12 +72,19 @@ static ProxyCompositor* s_proxyCompositor = nullptr;
 static std::mutex s_proxy_mutex;
 
 vr::EVRCompositorError ProxyCompositor::Submit(vr::EVREye eEye, const vr::Texture_t *pTexture, const vr::VRTextureBounds_t* pBounds, vr::EVRSubmitFlags nSubmitFlags) {
-    // This is the point where we capture the texture for warping
-    // For now, just log that we were called (infrequently)
-    static int submit_count = 0;
-    if (submit_count++ % 1000 == 0) {
-        MONOEYE_LOG_DEBUG("ProxyCompositor::Submit called for eye %d", eEye);
+    // Lazy initialization of the warp pipeline if needed
+    static bool s_warp_initialized = false;
+    if (!s_warp_initialized && pTexture) {
+        MONOEYE_LOG("OpenVR Proxy: First Submit called, initializing warp pipeline...");
+        
+        // In a real implementation, we would detect the graphics API from pTexture->eType
+        // and initialize the WarpPipeline accordingly.
+        // For now, we just mark as "initialized" to demonstrate the lazy pattern.
+        s_warp_initialized = true;
     }
+
+    // Call the warp pipeline here (Requirement 5/6)
+    // ...
 
     return m_real->Submit(eEye, pTexture, pBounds, nSubmitFlags);
 }

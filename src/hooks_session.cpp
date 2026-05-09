@@ -185,4 +185,36 @@ extern "C" XrResult XRAPI_CALL monoeye_xrDestroySession(XrSession session) {
   return ((PFN_xrDestroySession)dispatch->xrDestroySession)(session);
 }
 
+extern "C" XrResult XRAPI_CALL monoeye_xrLocateSpace(
+    XrSpace space,
+    XrSpace baseSpace,
+    XrTime time,
+    XrSpaceLocation* location
+) {
+    // We need an instance to get the dispatch table. 
+    // Since we don't track every space yet, we use the global pointer as a fallback.
+    if (!monoeye::g_nextGetInstanceProcAddr) return XR_ERROR_RUNTIME_FAILURE;
+
+    PFN_xrLocateSpace next_xrLocateSpace = nullptr;
+    monoeye::g_nextGetInstanceProcAddr(XR_NULL_HANDLE, "xrLocateSpace", (PFN_xrVoidFunction*)&next_xrLocateSpace);
+
+    if (!next_xrLocateSpace) return XR_ERROR_RUNTIME_FAILURE;
+
+    XrResult res = next_xrLocateSpace(space, baseSpace, time, location);
+
+    // REQUIREMENT 4: Interaction Motion Source Failsafe
+    // If the runtime fails to locate the space (e.g. unknown interaction source),
+    // we return XR_SUCCESS with tracking bits cleared to prevent the engine from stalling.
+    if (res != XR_SUCCESS && location) {
+        static int failsafe_count = 0;
+        if (failsafe_count++ % 1000 == 0) {
+            MONOEYE_LOG_WARN("xrLocateSpace failsafe triggered (res=%d). Bypassing unknown motion source.", res);
+        }
+        location->locationFlags = 0; // Not tracked, but valid structure
+        return XR_SUCCESS;
+    }
+
+    return res;
+}
+
 } // namespace monoeye

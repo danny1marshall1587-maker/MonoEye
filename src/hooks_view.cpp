@@ -113,6 +113,14 @@ extern "C" XrResult XRAPI_CALL monoeye_xrLocateViews(
         }
     }
 
+    // REQUIREMENT 4: Interaction Motion Source Failsafe
+    if (result != XR_SUCCESS && viewState) {
+        MONOEYE_LOG_WARN("xrLocateViews failsafe triggered (res=%d).", result);
+        viewState->viewStateFlags = 0;
+        if (viewCountOutput) *viewCountOutput = 0;
+        return XR_SUCCESS;
+    }
+
     // Mono mode: mirror left eye pose/fov into all other views so the app
     // gets consistent stereo data but we only render once.
     if (result == XR_SUCCESS && views && viewCountOutput && *viewCountOutput >= 2) {
