@@ -8,8 +8,16 @@
 #include <cstring>
 #include <new>
 #include <mutex>
+#include <string>
+#include <algorithm>
+
+#ifdef _WIN32
+#include <windows.h>
+#endif
 
 using namespace monoeye;
+
+bool g_process_bypass = false;
 
 
 extern "C" XRAPI_ATTR XrResult XRAPI_CALL LayerXrCreateApiLayerInstance(
@@ -18,6 +26,19 @@ extern "C" XRAPI_ATTR XrResult XRAPI_CALL LayerXrCreateApiLayerInstance(
     XrInstance* instance
 ) {
     MONOEYE_LOG("LayerXrCreateApiLayerInstance called");
+
+#ifdef _WIN32
+    char exePath[MAX_PATH];
+    if (GetModuleFileNameA(NULL, exePath, MAX_PATH)) {
+        std::string exeName = exePath;
+        std::transform(exeName.begin(), exeName.end(), exeName.begin(), ::tolower);
+        if (exeName.find("cef") != std::string::npos ||
+            exeName.find("steamwebhelper") != std::string::npos) {
+            g_process_bypass = true;
+            MONOEYE_LOG_WARN("Sandboxed UI process detected (%s). MonoEye entering pure passthrough mode.", exePath);
+        }
+    }
+#endif
 
     if (!apiLayerInfo || !info || !instance) {
         MONOEYE_LOG_ERROR("Invalid parameters to LayerXrCreateApiLayerInstance");

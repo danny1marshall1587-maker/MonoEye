@@ -175,7 +175,6 @@ extern "C" __declspec(dllexport) void* VR_CALLTYPE VR_GetGenericInterface(const 
 
     // Wrap the compositor if requested
     if (strcmp(pchInterfaceVersion, "IVRCompositor_026") == 0) {
-        std::lock_guard<std::mutex> lock(monoeye::s_proxy_mutex);
         if (!monoeye::s_proxyCompositor_026) {
             MONOEYE_LOG("OpenVR Proxy: Creating strict 026 compositor wrapper for %s", pchInterfaceVersion);
             monoeye::s_proxyCompositor_026 = new monoeye::ProxyCompositor_026((vr::IVRCompositor*)iface);
@@ -183,7 +182,6 @@ extern "C" __declspec(dllexport) void* VR_CALLTYPE VR_GetGenericInterface(const 
         return monoeye::s_proxyCompositor_026;
     }
     else if (strstr(pchInterfaceVersion, "IVRCompositor_")) {
-        std::lock_guard<std::mutex> lock(monoeye::s_proxy_mutex);
         if (!monoeye::s_proxyCompositor) {
             MONOEYE_LOG("OpenVR Proxy: Creating compositor wrapper for %s", pchInterfaceVersion);
             monoeye::s_proxyCompositor = new monoeye::ProxyCompositor((vr::IVRCompositor*)iface);

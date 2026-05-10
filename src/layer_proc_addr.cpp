@@ -265,13 +265,19 @@ extern "C" XRAPI_ATTR XrResult XRAPI_CALL LayerXrGetInstanceProcAddr(
 
     MONOEYE_LOG_DEBUG("xrGetInstanceProcAddr: %s", name);
 
+    extern bool g_process_bypass;
+
     // 1. Check if this is a function we hook — return our override immediately
-    for (int i = 0; s_hooked_functions[i].name != nullptr; ++i) {
-        if (strcmp(name, s_hooked_functions[i].name) == 0) {
-            *function = s_hooked_functions[i].function;
-            MONOEYE_LOG_DEBUG("  -> returning hooked function");
-            return XR_SUCCESS;
+    if (!g_process_bypass) {
+        for (int i = 0; s_hooked_functions[i].name != nullptr; ++i) {
+            if (strcmp(name, s_hooked_functions[i].name) == 0) {
+                *function = s_hooked_functions[i].function;
+                MONOEYE_LOG_DEBUG("  -> returning hooked function");
+                return XR_SUCCESS;
+            }
         }
+    } else {
+        MONOEYE_LOG_DEBUG("  -> bypassing hook due to process filter");
     }
 
     // 2. Try the per-instance dispatch table. This is the most accurate

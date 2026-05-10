@@ -236,6 +236,10 @@ extern "C" XrResult XRAPI_CALL monoeye_xrEndFrame(
                 modifiedLayers.push_back(reinterpret_cast<const XrCompositionLayerBaseHeader*>(&newLayer));
                 continue;
             }
+        } else if (layer->type == XR_TYPE_COMPOSITION_LAYER_QUAD) {
+            MONOEYE_LOG_DEBUG("Flat UI layer (XR_TYPE_COMPOSITION_LAYER_QUAD) detected. Passing through untouched.");
+            modifiedLayers.push_back(layer);
+            continue;
         }
         
         // Default: Keep original layer
