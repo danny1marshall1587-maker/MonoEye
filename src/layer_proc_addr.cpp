@@ -254,6 +254,8 @@ static const HookedFunction s_hooked_functions[] = {
     {nullptr, nullptr}
 };
 
+extern bool g_process_bypass;
+
 extern "C" XRAPI_ATTR XrResult XRAPI_CALL LayerXrGetInstanceProcAddr(
     XrInstance instance,
     const char* name,
@@ -264,8 +266,6 @@ extern "C" XRAPI_ATTR XrResult XRAPI_CALL LayerXrGetInstanceProcAddr(
     }
 
     MONOEYE_LOG_DEBUG("xrGetInstanceProcAddr: %s", name);
-
-    extern bool g_process_bypass;
 
     // 1. Check if this is a function we hook — return our override immediately
     if (!g_process_bypass) {
