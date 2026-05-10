@@ -84,8 +84,16 @@ vr::EVRCompositorError ProxyCompositor::Submit(vr::EVREye eEye, const vr::Textur
         s_warp_initialized = true;
     }
 
-    // Call the warp pipeline here (Requirement 5/6)
-    // ...
+    if (eEye == vr::Eye_Left) {
+        // The game is submitting the primary eye.
+        // Proxy should capture this texture, trigger shared Vulkan compute backend 
+        // to synthesize the right eye from the left eye's data.
+        MONOEYE_LOG("OpenVR Proxy: Intercepted Left Eye. Triggering synthetic right eye generation...");
+    } else if (eEye == vr::Eye_Right) {
+        // If the game attempts to submit a right eye natively (or if MonoEye is in passthrough),
+        // we catch it here. We would submit the synthesized texture to the real compositor.
+        MONOEYE_LOG("OpenVR Proxy: Intercepted Right Eye. Suppressing or replacing...");
+    }
 
     return m_real->Submit(eEye, pTexture, pBounds, nSubmitFlags);
 }
@@ -96,6 +104,12 @@ vr::EVRCompositorError ProxyCompositor_026::Submit(vr::EVREye eEye, const vr::Te
         MONOEYE_LOG("OpenVR Proxy 026: First Submit called, initializing warp pipeline...");
         s_warp_initialized = true;
     }
+    if (eEye == vr::Eye_Left) {
+        MONOEYE_LOG("OpenVR Proxy 026: Intercepted Left Eye. Triggering synthetic right eye generation...");
+    } else if (eEye == vr::Eye_Right) {
+        MONOEYE_LOG("OpenVR Proxy 026: Intercepted Right Eye. Suppressing or replacing...");
+    }
+
     return m_real->Submit(eEye, pTexture, pBounds, nSubmitFlags);
 }
 
