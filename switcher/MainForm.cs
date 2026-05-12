@@ -399,7 +399,7 @@ namespace MonoEyeSwitcher
             saveLogButton.Click += SaveLogButton_Click;
             diagnosticsGroupBox.Controls.Add(saveLogButton);
 
-            logInfoLabel = new Label
+            Label logInfoLabel = new Label
             {
                 Text = "Logs are saved to Documents\\MonoEye",
                 Font = new Font("Segoe UI", 7F),
