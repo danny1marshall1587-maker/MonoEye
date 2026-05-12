@@ -112,8 +112,14 @@ static void log_worker() {
 static void ensure_initialized() {
     if (s_log_initialized.exchange(true)) return;
 
-    // Default level
-    s_log_level = LOG_INFO;
+#ifdef _WIN32
+    // Unconditional DebugView breadcrumb - confirms DLL is loaded even if file logging fails.
+    // Visible in Sysinternals DebugView with no other setup required.
+    OutputDebugStringA("[MonoEye] ensure_initialized() called - DLL is loaded and running.\n");
+#endif
+
+    // Always use DEBUG level to capture everything during diagnostics
+    s_log_level = LOG_DEBUG;
 
     const char* level_str = getenv("MONOEYE_LOG_LEVEL");
     if (level_str) {
@@ -126,10 +132,9 @@ static void ensure_initialized() {
         }
     }
 
-    const char* enabled_str = getenv("MONOEYE_LOG_ENABLED");
-    bool logging_enabled = !enabled_str || (enabled_str[0] != '0' && enabled_str[0] != 'f' && enabled_str[0] != 'F');
-
-    if (logging_enabled) {
+    // Log file is ALWAYS created - MONOEYE_LOG_ENABLED only controls log LEVEL not file creation.
+    // Previously this gate was silently swallowing all output when the var was unset or "0".
+    {
         char log_path[512] = {0};
 
 #ifdef _WIN32
@@ -144,7 +149,7 @@ static void ensure_initialized() {
         if (home) {
             snprintf(log_path, sizeof(log_path), "%s/Documents/MonoEye", home);
             char mkdir_cmd[512];
-            snprintf(mkdir_cmd, sizeof(mkdir_cmd), "mkdir -p %s", log_path);
+            snprintf(mkdir_cmd, sizeof(mkdir_cmd), "mkdir -p '%s'", log_path);
             int res = system(mkdir_cmd);
             (void)res;
             strncat(log_path, "/monoeye.log", sizeof(log_path) - strlen(log_path) - 1);
@@ -153,10 +158,23 @@ static void ensure_initialized() {
         if (log_path[0] != '\0') {
             s_log_file = fopen(log_path, "w");
             if (s_log_file) {
-                fprintf(s_log_file, "=== MonoEye Async Debug Log ===\n");
-                fprintf(s_log_file, "Build Date: %s %s\n\n", __DATE__, __TIME__);
+                fprintf(s_log_file, "=== MonoEye Debug Log ===\n");
+                fprintf(s_log_file, "Build Date: %s %s\n", __DATE__, __TIME__);
+#ifdef _WIN32
+                char exe_path[MAX_PATH] = {0};
+                GetModuleFileNameA(NULL, exe_path, MAX_PATH);
+                fprintf(s_log_file, "Host Process: %s\n", exe_path);
+#endif
+                fprintf(s_log_file, "\n");
                 fflush(s_log_file);
             }
+#ifdef _WIN32
+            else {
+                char err_msg[600];
+                snprintf(err_msg, sizeof(err_msg), "[MonoEye] FAILED to open log file: %s (errno=%d)\n", log_path, errno);
+                OutputDebugStringA(err_msg);
+            }
+#endif
         }
     }
 
