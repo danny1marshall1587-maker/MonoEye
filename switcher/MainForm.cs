@@ -1,7 +1,10 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
-using Microsoft.Win32;
+using Microsoft.Win32;using System.IO;
+using System.IO.Pipes;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace MonoEyeSwitcher
 {
@@ -33,18 +36,28 @@ namespace MonoEyeSwitcher
         private Label gameFolderLabel;
         private Button saveButton;
 
+        private TextBox consoleTextBox;
+        private CancellationTokenSource pipeCts;
+
         private bool isEnabled = false;
 
         public MainForm()
         {
             InitializeComponent();
             UpdateStatus();
+            StartPipeServer();
+        }
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            pipeCts?.Cancel();
+            base.OnFormClosing(e);
         }
 
         private void InitializeComponent()
         {
             this.Text = "MonoEye Switcher v0.5.20 (Alpha)";
-            this.Size = new Size(420, 560);
+            this.Size = new Size(820, 960);
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
             this.StartPosition = FormStartPosition.CenterScreen;
@@ -386,7 +399,7 @@ namespace MonoEyeSwitcher
             saveLogButton.Click += SaveLogButton_Click;
             diagnosticsGroupBox.Controls.Add(saveLogButton);
 
-            Label logInfoLabel = new Label
+            logInfoLabel = new Label
             {
                 Text = "Logs are saved to Documents\\MonoEye",
                 Font = new Font("Segoe UI", 7F),
@@ -397,7 +410,91 @@ namespace MonoEyeSwitcher
             };
             diagnosticsGroupBox.Controls.Add(logInfoLabel);
 
-            this.Size = new Size(415, 960);
+            // --- Real-time Console Section ---
+            GroupBox consoleGroupBox = new GroupBox
+            {
+                Text = "Live Diagnostics Console",
+                ForeColor = Color.FromArgb(0, 255, 150),
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                Size = new Size(370, 895),
+                Location = new Point(410, 15)
+            };
+            this.Controls.Add(consoleGroupBox);
+
+            consoleTextBox = new TextBox
+            {
+                Multiline = true,
+                ReadOnly = true,
+                ScrollBars = ScrollBars.Vertical,
+                BackColor = Color.FromArgb(10, 10, 10),
+                ForeColor = Color.LightGreen,
+                Font = new Font("Consolas", 8F),
+                Size = new Size(340, 860),
+                Location = new Point(15, 25)
+            };
+            consoleGroupBox.Controls.Add(consoleTextBox);
+
+            this.Size = new Size(820, 960);
+        }
+
+        private void StartPipeServer()
+        {
+            pipeCts = new CancellationTokenSource();
+            Task.Run(() => PipeServerLoop(pipeCts.Token));
+        }
+
+        private async Task PipeServerLoop(CancellationToken token)
+        {
+            while (!token.IsCancellationRequested)
+            {
+                try
+                {
+                    using (var pipeServer = new NamedPipeServerStream("MonoEyeLogs", PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous))
+                    {
+                        await pipeServer.WaitForConnectionAsync(token);
+
+                        Invoke((MethodInvoker)delegate
+                        {
+                            if (consoleTextBox.TextLength > 10000) consoleTextBox.Clear();
+                            consoleTextBox.AppendText($"\r\n[{DateTime.Now:HH:mm:ss}] === IPC CONNECTION ESTABLISHED ===\r\n");
+                        });
+
+                        using (var reader = new StreamReader(pipeServer))
+                        {
+                            while (!token.IsCancellationRequested && pipeServer.IsConnected)
+                            {
+                                string line = await reader.ReadLineAsync();
+                                if (line == null) break; // Client disconnected
+
+                                Invoke((MethodInvoker)delegate
+                                {
+                                    if (consoleTextBox.TextLength > 50000) consoleTextBox.Text = consoleTextBox.Text.Substring(10000); // rudimentary truncate
+                                    consoleTextBox.AppendText(line + "\r\n");
+                                    consoleTextBox.SelectionStart = consoleTextBox.Text.Length;
+                                    consoleTextBox.ScrollToCaret();
+                                });
+                            }
+                        }
+
+                        Invoke((MethodInvoker)delegate
+                        {
+                            consoleTextBox.AppendText($"[{DateTime.Now:HH:mm:ss}] === IPC CONNECTION CLOSED ===\r\n");
+                        });
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    Invoke((MethodInvoker)delegate
+                    {
+                        consoleTextBox.AppendText($"[Pipe Error] {ex.Message}\r\n");
+                    });
+                    await Task.Delay(2000, token); // delay before retry
+                }
+            }
         }
 
         private void UpdateStatus()

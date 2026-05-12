@@ -33,7 +33,32 @@ static std::mutex s_queue_mutex;
 static std::condition_variable s_queue_cv;
 static std::queue<std::string> s_log_queue;
 
+#ifdef _WIN32
+static HANDLE s_pipe_handle = INVALID_HANDLE_VALUE;
+
+static void connect_pipe() {
+    if (s_pipe_handle == INVALID_HANDLE_VALUE) {
+        s_pipe_handle = CreateFileA("\\\\.\\pipe\\MonoEyeLogs", GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
+        if (s_pipe_handle != INVALID_HANDLE_VALUE) {
+            char exe_path[MAX_PATH] = {0};
+            GetModuleFileNameA(NULL, exe_path, MAX_PATH);
+            const char* filename = exe_path;
+            for (const char* p = exe_path; *p; ++p) {
+                if (*p == '/' || *p == '\\') filename = p + 1;
+            }
+            char msg[512];
+            snprintf(msg, sizeof(msg), "[SYSTEM] Connected from game process: %s\r\n", filename);
+            DWORD written;
+            WriteFile(s_pipe_handle, msg, strlen(msg), &written, NULL);
+        }
+    }
+}
+#endif
+
 static void log_worker() {
+#ifdef _WIN32
+    connect_pipe();
+#endif
     while (s_log_running) {
         std::string msg;
         {
@@ -61,6 +86,25 @@ static void log_worker() {
 #ifdef _WIN32
         // Also output to DebugView on Windows
         OutputDebugStringA((msg + "\n").c_str());
+
+        // Output to Named Pipe
+        if (s_pipe_handle == INVALID_HANDLE_VALUE) {
+            static auto last_connect_try = std::chrono::steady_clock::now();
+            auto now = std::chrono::steady_clock::now();
+            if (std::chrono::duration_cast<std::chrono::seconds>(now - last_connect_try).count() >= 2) {
+                connect_pipe();
+                last_connect_try = now;
+            }
+        }
+
+        if (s_pipe_handle != INVALID_HANDLE_VALUE) {
+            std::string pipe_msg = msg + "\r\n";
+            DWORD written;
+            if (!WriteFile(s_pipe_handle, pipe_msg.c_str(), (DWORD)pipe_msg.length(), &written, NULL)) {
+                CloseHandle(s_pipe_handle);
+                s_pipe_handle = INVALID_HANDLE_VALUE;
+            }
+        }
 #endif
     }
 }
