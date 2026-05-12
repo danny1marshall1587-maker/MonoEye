@@ -3,6 +3,8 @@ using System.Drawing;
 using System.Windows.Forms;
 using Microsoft.Win32;using System.IO;
 using System.IO.Pipes;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -449,7 +451,10 @@ namespace MonoEyeSwitcher
             {
                 try
                 {
-                    using (var pipeServer = new NamedPipeServerStream("MonoEyeLogs", PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous))
+                    PipeSecurity ps = new PipeSecurity();
+                    ps.AddAccessRule(new PipeAccessRule(new SecurityIdentifier(WellKnownSidType.WorldSid, null), PipeAccessRights.ReadWrite, AccessControlType.Allow));
+
+                    using (var pipeServer = NamedPipeServerStreamAcl.Create("MonoEyeLogs", PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous, 0, 0, ps))
                     {
                         await pipeServer.WaitForConnectionAsync(token);
 
