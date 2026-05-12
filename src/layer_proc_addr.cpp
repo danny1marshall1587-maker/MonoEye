@@ -10,6 +10,8 @@
 #include <vulkan/vulkan.h>
 #include <openxr/openxr_platform.h>
 #include <cstring>
+#include <unordered_set>
+#include <string>
 
 
 
@@ -265,14 +267,40 @@ extern "C" XRAPI_ATTR XrResult XRAPI_CALL LayerXrGetInstanceProcAddr(
         return XR_ERROR_HANDLE_INVALID;
     }
 
-    MONOEYE_LOG_DEBUG("xrGetInstanceProcAddr: %s", name);
+    // Re-entry guard: if we are already executing this function on this thread
+    // (e.g., because the downstream chain routes back through us during startup
+    // enumeration), skip our hook table and forward directly to the next handler.
+    // This breaks the infinite recursion caused by Meta/Valve runtimes probing
+    // all XR functions (including META extensions) before session creation.
+    static thread_local bool s_in_get_proc_addr = false;
+    if (s_in_get_proc_addr) {
+        if (monoeye::g_nextGetInstanceProcAddr) {
+            return monoeye::g_nextGetInstanceProcAddr(instance, name, function);
+        }
+        *function = nullptr;
+        return XR_ERROR_FUNCTION_UNSUPPORTED;
+    }
+    s_in_get_proc_addr = true;
+
+    // Log the function lookup — but suppress repeat lookups of the same name
+    // to avoid flooding the log when runtimes probe every extension function.
+    {
+        static thread_local std::unordered_set<std::string> s_logged_names;
+        if (s_logged_names.find(name) == s_logged_names.end()) {
+            MONOEYE_LOG_DEBUG("xrGetInstanceProcAddr: %s", name);
+            s_logged_names.insert(name);
+        }
+    }
+
+    XrResult result = XR_ERROR_FUNCTION_UNSUPPORTED;
 
     // 1. Check if this is a function we hook — return our override immediately
     if (!g_process_bypass) {
         for (int i = 0; s_hooked_functions[i].name != nullptr; ++i) {
             if (strcmp(name, s_hooked_functions[i].name) == 0) {
                 *function = s_hooked_functions[i].function;
-                MONOEYE_LOG_DEBUG("  -> returning hooked function");
+                MONOEYE_LOG_DEBUG("  -> returning hooked function for %s", name);
+                s_in_get_proc_addr = false;
                 return XR_SUCCESS;
             }
         }
@@ -293,29 +321,30 @@ extern "C" XRAPI_ATTR XrResult XRAPI_CALL LayerXrGetInstanceProcAddr(
         }
 
         if (dispatch && dispatch->nextGetInstanceProcAddr) {
-            MONOEYE_LOG_DEBUG("  -> forwarding to instance nextGetInstanceProcAddr");
-            XrResult res = dispatch->nextGetInstanceProcAddr(instance, name, function);
-            if (res == XR_SUCCESS && *function == nullptr) {
-                return XR_ERROR_FUNCTION_UNSUPPORTED;
+            result = dispatch->nextGetInstanceProcAddr(instance, name, function);
+            if (result == XR_SUCCESS && *function == nullptr) {
+                result = XR_ERROR_FUNCTION_UNSUPPORTED;
             }
-            return res;
+            s_in_get_proc_addr = false;
+            return result;
         }
     }
 
     // 3. Fallback to the global pointer (used for NULL instance calls or 
     // if the instance isn't in our map yet).
     if (monoeye::g_nextGetInstanceProcAddr) {
-        MONOEYE_LOG_DEBUG("  -> forwarding to global g_nextGetInstanceProcAddr");
-        XrResult res = monoeye::g_nextGetInstanceProcAddr(instance, name, function);
-        if (res == XR_SUCCESS && *function == nullptr) {
-            return XR_ERROR_FUNCTION_UNSUPPORTED;
+        result = monoeye::g_nextGetInstanceProcAddr(instance, name, function);
+        if (result == XR_SUCCESS && *function == nullptr) {
+            result = XR_ERROR_FUNCTION_UNSUPPORTED;
         }
-        return res;
+        s_in_get_proc_addr = false;
+        return result;
     }
 
     MONOEYE_LOG_ERROR("xrGetInstanceProcAddr: no downstream handler for '%s' (instance: %p). "
                       "The call chain might be broken.", 
                       name, (void*)instance);
     *function = nullptr;
+    s_in_get_proc_addr = false;
     return XR_ERROR_FUNCTION_UNSUPPORTED;
 }

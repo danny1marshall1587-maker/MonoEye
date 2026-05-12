@@ -30,6 +30,8 @@ extern "C" XrResult XRAPI_CALL monoeye_xrBeginFrame(
     XrSession session,
     const XrFrameBeginInfo* frameBeginInfo
 ) {
+    MONOEYE_LOG_DEBUG("xrBeginFrame: session=%p", (void*)session);
+
     // Find the instance for this session
     XrInstance instance = XR_NULL_HANDLE;
     {
@@ -41,6 +43,7 @@ extern "C" XrResult XRAPI_CALL monoeye_xrBeginFrame(
     }
 
     if (instance == XR_NULL_HANDLE) {
+        MONOEYE_LOG("xrBeginFrame: session %p not found in map — returning SESSION_LOST", (void*)session);
         return XR_ERROR_SESSION_LOST;
     }
 
@@ -54,23 +57,31 @@ extern "C" XrResult XRAPI_CALL monoeye_xrBeginFrame(
     }
 
     if (!dispatch || !dispatch->xrBeginFrame) {
+        MONOEYE_LOG("xrBeginFrame: no dispatch table for instance %p", (void*)instance);
         return XR_ERROR_RUNTIME_FAILURE;
     }
 
     // Reset eye assignments for this new frame
     SwapchainTracker::get_instance().reset_eye_assignments();
 
-    // Wait for any pending warp operations to complete
-    WarpPipeline::get_instance().wait_for_completion();
+    // Only wait for warp completion if the pipeline is actually running —
+    // calling wait_for_completion() on an uninitialized pipeline can deadlock.
+    if (WarpPipeline::get_instance().is_initialized()) {
+        WarpPipeline::get_instance().wait_for_completion();
+    }
 
-    return ((PFN_xrBeginFrame)dispatch->xrBeginFrame)(session, frameBeginInfo);
-
+    XrResult result = ((PFN_xrBeginFrame)dispatch->xrBeginFrame)(session, frameBeginInfo);
+    MONOEYE_LOG_DEBUG("xrBeginFrame: downstream returned %d", (int)result);
+    return result;
 }
 
 extern "C" XrResult XRAPI_CALL monoeye_xrEndFrame(
     XrSession session,
     const XrFrameEndInfo* frameEndInfo
 ) {
+    MONOEYE_LOG_DEBUG("xrEndFrame: session=%p, layerCount=%u",
+                      (void*)session,
+                      frameEndInfo ? frameEndInfo->layerCount : 0u);
     const Config& config = get_config();
 
     SessionType sessionType = SESSION_UNKNOWN;

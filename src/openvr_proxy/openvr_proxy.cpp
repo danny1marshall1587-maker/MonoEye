@@ -73,41 +73,104 @@ static ProxyCompositor_026* s_proxyCompositor_026 = nullptr;
 static std::mutex s_proxy_mutex;
 
 vr::EVRCompositorError ProxyCompositor::Submit(vr::EVREye eEye, const vr::Texture_t *pTexture, const vr::VRTextureBounds_t* pBounds, vr::EVRSubmitFlags nSubmitFlags) {
-    // Lazy initialization of the warp pipeline if needed
+    // Lazy initialization diagnostic on first submit
     static bool s_warp_initialized = false;
     if (!s_warp_initialized && pTexture) {
         MONOEYE_LOG("OpenVR Proxy: First Submit called, initializing warp pipeline...");
-        
-        // In a real implementation, we would detect the graphics API from pTexture->eType
-        // and initialize the WarpPipeline accordingly.
-        // For now, we just mark as "initialized" to demonstrate the lazy pattern.
+        MONOEYE_LOG("OpenVR Proxy: Texture eType=%d (0=DX11, 1=GL, 2=Vulkan, 3=DX12)",
+                    (int)pTexture->eType);
         s_warp_initialized = true;
     }
 
     if (eEye == vr::Eye_Left) {
-        // The game is submitting the primary eye.
-        // Proxy should capture this texture, trigger shared Vulkan compute backend 
-        // to synthesize the right eye from the left eye's data.
-        MONOEYE_LOG("OpenVR Proxy: Intercepted Left Eye. Triggering synthetic right eye generation...");
+        // Save the left eye for right-eye synthesis
+        if (pTexture) {
+            m_lastLeftTexture = *pTexture;
+            m_hasLeftTexture  = true;
+        }
+        m_lastLeftBounds = pBounds ? *pBounds : vr::VRTextureBounds_t{0.0f, 0.0f, 1.0f, 1.0f};
+        m_leftFlags      = nSubmitFlags;
+
+        MONOEYE_LOG("OpenVR Proxy: LEFT eye submit, eType=%d, handle=%p, flags=0x%x",
+                    pTexture ? (int)pTexture->eType : -1,
+                    pTexture ? pTexture->handle : nullptr,
+                    (unsigned)nSubmitFlags);
+
+        vr::EVRCompositorError err = m_real->Submit(eEye, pTexture, pBounds, nSubmitFlags);
+        if (err != vr::VRCompositorError_None) {
+            MONOEYE_LOG("OpenVR Proxy: LEFT eye real compositor returned ERROR %d", (int)err);
+        }
+        return err;
+
     } else if (eEye == vr::Eye_Right) {
-        // If the game attempts to submit a right eye natively (or if MonoEye is in passthrough),
-        // we catch it here. We would submit the synthesized texture to the real compositor.
-        MONOEYE_LOG("OpenVR Proxy: Intercepted Right Eye. Suppressing or replacing...");
+        // Suppress the game's native right-eye submit.
+        // Instead, re-submit the saved left-eye texture as the right eye.
+        // This produces a flat (non-warped) stereo view — both eyes see the same
+        // mono image — which confirms the submit pipeline is working.
+        if (m_hasLeftTexture) {
+            MONOEYE_LOG("OpenVR Proxy: RIGHT eye SYNTHESIZED from left (mono->stereo)");
+            vr::EVRCompositorError err = m_real->Submit(
+                vr::Eye_Right, &m_lastLeftTexture, &m_lastLeftBounds, m_leftFlags);
+            if (err != vr::VRCompositorError_None) {
+                MONOEYE_LOG("OpenVR Proxy: RIGHT eye synthetic compositor returned ERROR %d", (int)err);
+            }
+            return err;
+        } else {
+            // Fallback: no left eye saved yet, pass through unchanged
+            MONOEYE_LOG("OpenVR Proxy: RIGHT eye — no left saved yet, passing through");
+            return m_real->Submit(eEye, pTexture, pBounds, nSubmitFlags);
+        }
     }
 
     return m_real->Submit(eEye, pTexture, pBounds, nSubmitFlags);
 }
 
 vr::EVRCompositorError ProxyCompositor_026::Submit(vr::EVREye eEye, const vr::Texture_t *pTexture, const vr::VRTextureBounds_t* pBounds, vr::EVRSubmitFlags nSubmitFlags) {
+    // Lazy initialization diagnostic on first submit
     static bool s_warp_initialized = false;
     if (!s_warp_initialized && pTexture) {
-        MONOEYE_LOG("OpenVR Proxy 026: First Submit called, initializing warp pipeline...");
+        MONOEYE_LOG("OpenVR Proxy 026: First Submit called — LMU pipeline active");
+        MONOEYE_LOG("OpenVR Proxy 026: Texture eType=%d (0=DX11, 1=GL, 2=Vulkan, 3=DX12)",
+                    (int)pTexture->eType);
         s_warp_initialized = true;
     }
+
     if (eEye == vr::Eye_Left) {
-        MONOEYE_LOG("OpenVR Proxy 026: Intercepted Left Eye. Triggering synthetic right eye generation...");
+        // Save the left eye for right-eye synthesis
+        if (pTexture) {
+            m_lastLeftTexture = *pTexture;
+            m_hasLeftTexture  = true;
+        }
+        m_lastLeftBounds = pBounds ? *pBounds : vr::VRTextureBounds_t{0.0f, 0.0f, 1.0f, 1.0f};
+        m_leftFlags      = nSubmitFlags;
+
+        MONOEYE_LOG("OpenVR Proxy 026: LEFT eye submit, eType=%d, handle=%p, flags=0x%x",
+                    pTexture ? (int)pTexture->eType : -1,
+                    pTexture ? pTexture->handle : nullptr,
+                    (unsigned)nSubmitFlags);
+
+        vr::EVRCompositorError err = m_real->Submit(eEye, pTexture, pBounds, nSubmitFlags);
+        if (err != vr::VRCompositorError_None) {
+            MONOEYE_LOG("OpenVR Proxy 026: LEFT eye real compositor returned ERROR %d", (int)err);
+        }
+        return err;
+
     } else if (eEye == vr::Eye_Right) {
-        MONOEYE_LOG("OpenVR Proxy 026: Intercepted Right Eye. Suppressing or replacing...");
+        // Suppress the game's native right-eye submit.
+        // Re-submit the saved left-eye texture as the right eye for flat stereo view.
+        if (m_hasLeftTexture) {
+            MONOEYE_LOG("OpenVR Proxy 026: RIGHT eye SYNTHESIZED from left (mono->stereo)");
+            vr::EVRCompositorError err = m_real->Submit(
+                vr::Eye_Right, &m_lastLeftTexture, &m_lastLeftBounds, m_leftFlags);
+            if (err != vr::VRCompositorError_None) {
+                MONOEYE_LOG("OpenVR Proxy 026: RIGHT eye synthetic compositor returned ERROR %d", (int)err);
+            }
+            return err;
+        } else {
+            // Fallback: no left eye saved yet, pass through unchanged
+            MONOEYE_LOG("OpenVR Proxy 026: RIGHT eye — no left saved yet, passing through");
+            return m_real->Submit(eEye, pTexture, pBounds, nSubmitFlags);
+        }
     }
 
     return m_real->Submit(eEye, pTexture, pBounds, nSubmitFlags);

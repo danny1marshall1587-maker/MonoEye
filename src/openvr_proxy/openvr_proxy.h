@@ -85,7 +85,14 @@ public:
 
 private:
     vr::IVRCompositor* m_real;
+
+    // Left-eye state for mono-to-stereo synthesis
+    vr::Texture_t          m_lastLeftTexture   = {};
+    vr::VRTextureBounds_t  m_lastLeftBounds    = {0.0f, 0.0f, 1.0f, 1.0f};
+    vr::EVRSubmitFlags     m_leftFlags         = vr::Submit_Default;
+    bool                   m_hasLeftTexture    = false;
 };
+
 
 // VTable definition for older games (like Le Mans Ultimate) requesting IVRCompositor_026
 struct IVRCompositor_026_VTable {
@@ -209,6 +216,13 @@ public:
 
 private:
     vr::IVRCompositor* m_real;
+
+    // Left-eye state for mono-to-stereo synthesis
+    vr::Texture_t          m_lastLeftTexture   = {};
+    vr::VRTextureBounds_t  m_lastLeftBounds    = {0.0f, 0.0f, 1.0f, 1.0f};
+    vr::EVRSubmitFlags     m_leftFlags         = vr::Submit_Default;
+    bool                   m_hasLeftTexture    = false;
 };
+
 
 } // namespace monoeye
