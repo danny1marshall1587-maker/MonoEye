@@ -240,7 +240,7 @@ extern "C" __declspec(dllexport) void* VR_CALLTYPE VR_GetGenericInterface(const 
     if (strcmp(pchInterfaceVersion, "IVRCompositor_026") == 0) {
         if (!monoeye::s_proxyCompositor_026) {
             MONOEYE_LOG("OpenVR Proxy: Creating strict 026 compositor wrapper for %s", pchInterfaceVersion);
-            monoeye::s_proxyCompositor_026 = new monoeye::ProxyCompositor_026((vr::IVRCompositor*)iface);
+            monoeye::s_proxyCompositor_026 = new monoeye::ProxyCompositor_026((monoeye::IVRCompositor_026_VTable*)iface);
         }
         return monoeye::s_proxyCompositor_026;
     }

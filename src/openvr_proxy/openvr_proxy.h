@@ -151,7 +151,7 @@ struct IVRCompositor_026_VTable {
 
 class ProxyCompositor_026 : public IVRCompositor_026_VTable {
 public:
-    ProxyCompositor_026(vr::IVRCompositor* real) : m_real(real) {}
+    ProxyCompositor_026(IVRCompositor_026_VTable* real) : m_real(real) {}
 
     virtual void SetTrackingSpace(vr::ETrackingUniverseOrigin eOrigin) override { m_real->SetTrackingSpace(eOrigin); }
     virtual vr::ETrackingUniverseOrigin GetTrackingSpace() override { return m_real->GetTrackingSpace(); }
@@ -215,7 +215,7 @@ public:
     virtual vr::EVRCompositorError GetPosesForFrame(uint32_t unPosePredictionID, vr::TrackedDevicePose_t* pPoseArray, uint32_t unPoseArrayCount) override { return m_real->GetPosesForFrame(unPosePredictionID, pPoseArray, unPoseArrayCount); }
 
 private:
-    vr::IVRCompositor* m_real;
+    IVRCompositor_026_VTable* m_real;
 
     // Left-eye state for mono-to-stereo synthesis
     vr::Texture_t          m_lastLeftTexture   = {};

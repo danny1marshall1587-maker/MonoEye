@@ -59,7 +59,7 @@ namespace MonoEyeSwitcher
 
         private void InitializeComponent()
         {
-            this.Text = "MonoEye Switcher v0.5.20 (Alpha)";
+            this.Text = "MonoEye Switcher v0.5.70 (Alpha)";
             this.Size = new Size(820, 960);
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
