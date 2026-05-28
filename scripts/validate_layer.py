@@ -102,13 +102,8 @@ def check_chain_ptr_usage():
 # ─── 4. Check for GeneratedXrPopulateDispatchTable (causes 500+ xrGIPA calls) ─
 
 def check_no_full_populate():
-    """Warn if GeneratedXrPopulateDispatchTable is called — it floods xrGIPA."""
-    pattern = re.compile(r'GeneratedXrPopulateDispatchTable\s*\(')
-    for fpath in sorted(SRC.glob("*.cpp")):
-        text = fpath.read_text(errors='replace')
-        for m in pattern.finditer(text):
-            lineno = text[:m.start()].count('\n') + 1
-            err(f"{fpath.name}:{lineno}: GeneratedXrPopulateDispatchTable floods xrGetInstanceProcAddr with 500+ calls causing log loops — use manual minimal resolution instead")
+    """Skipped - Full population is intentionally used to support modern games like AC Evo."""
+    pass
 
 # ─── 5. Check hooked functions in layer_proc_addr.cpp have forward decls ──────
 
@@ -118,36 +113,19 @@ def check_hook_decls():
 
     # Extract names from s_hooked_functions table
     hooked = re.findall(r'\{"(xr\w+)"', pa)
-    # Extract extern "C" forward declarations
-    decls = set(re.findall(r'extern\s+"C"\s+XrResult\s+(monoeye_\w+)\s*\(', pa))
+    # Extract extern "C" forward declarations with calling conventions
+    decls = set(re.findall(r'extern\s+"C"\s+(?:XRAPI_ATTR\s+)?(?:XRAPI_CALL\s+)?XrResult\s+(?:XRAPI_CALL\s+)?(monoeye_\w+|LayerXrDestroyInstance)\s*\(', pa))
 
     for fn in hooked:
-        decl_name = f"monoeye_{fn}"
+        decl_name = "LayerXrDestroyInstance" if fn == "xrDestroyInstance" else f"monoeye_{fn}"
         if decl_name not in decls:
             err(f"layer_proc_addr.cpp: hooked function '{fn}' has no extern \"C\" forward declaration for '{decl_name}'")
 
 # ─── 6. Check all downstream calls match our minimal dispatch table ───────────
 
 def check_minimal_dispatch_completeness():
-    """Functions called via dispatch->xrFoo in hooks must be in layer_instance.cpp resolution."""
-    instance_cpp = (SRC / "layer_instance.cpp").read_text(errors='replace')
-    resolved = set(re.findall(r'nextGetInstanceProcAddr\s*\(\s*\*instance\s*,\s*"(\w+)"', instance_cpp))
-    resolved.add("xrDestroyInstance")  # may be handled separately
-
-    # Find all downstream calls in hook files
-    call_pattern = re.compile(r'dispatch\s*->\s*(xr\w+)')
-    hook_files = [f for f in SRC.glob("*.cpp") if f.name not in ("layer_instance.cpp", "layer_proc_addr.cpp", "layer_negotiation.cpp")]
-
-    called = {}
-    for fpath in sorted(hook_files):
-        text = fpath.read_text(errors='replace')
-        for m in call_pattern.finditer(text):
-            fn = m.group(1)
-            called.setdefault(fn, fpath.name)
-
-    for fn, src_file in sorted(called.items()):
-        if fn not in resolved:
-            err(f"{src_file}: calls dispatch->{fn} but '{fn}' is not resolved in layer_instance.cpp minimal dispatch table")
+    """Skipped - We now use the fully populated generated dispatch table."""
+    pass
 
 # ─── 7. Check cast correctness around xrGetInstanceProcAddr ──────────────────
 
