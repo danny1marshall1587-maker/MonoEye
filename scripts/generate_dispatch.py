@@ -14,9 +14,15 @@ def parse_commands(xml_path):
     root = tree.getroot()
 
     commands = {}
+    aliases = {}
 
     for cmd_elem in root.findall('.//commands/command'):
-        if cmd_elem.get('alias'):
+        cmd_name = cmd_elem.get('name')
+        alias_name = cmd_elem.get('alias')
+        
+        if alias_name:
+            # This is an alias, we'll handle it after all base commands are parsed
+            aliases[cmd_name] = alias_name
             continue
 
         proto = cmd_elem.find('proto')
@@ -58,7 +64,13 @@ def parse_commands(xml_path):
             'params': params,
         }
 
+    # Now add aliases
+    for alias_name, target_name in aliases.items():
+        if target_name in commands:
+            commands[alias_name] = commands[target_name]
+
     return commands
+
 
 
 def generate_dispatch_header(commands, output_path):
@@ -73,10 +85,30 @@ def generate_dispatch_header(commands, output_path):
 #pragma once
 
 #ifdef _WIN32
-#ifndef NOMINMAX
-#define NOMINMAX
+    #ifndef NOMINMAX
+    #define NOMINMAX
+    #endif
+    #ifndef WIN32_LEAN_AND_MEAN
+    #define WIN32_LEAN_AND_MEAN
+    #endif
+    #include <windows.h>
+    #include <unknwn.h>
+    #include <d3d11.h>
+    #include <d3d12.h>
+
+    #ifndef XR_USE_PLATFORM_WIN32
+    #define XR_USE_PLATFORM_WIN32
+    #endif
+    #ifndef XR_USE_GRAPHICS_API_D3D11
+    #define XR_USE_GRAPHICS_API_D3D11
+    #endif
+    #ifndef XR_USE_GRAPHICS_API_D3D12
+    #define XR_USE_GRAPHICS_API_D3D12
+    #endif
 #endif
-#include <windows.h>
+
+#ifndef XR_USE_GRAPHICS_API_VULKAN
+#define XR_USE_GRAPHICS_API_VULKAN
 #endif
 
 #include <vulkan/vulkan.h>
@@ -86,18 +118,21 @@ def generate_dispatch_header(commands, output_path):
 namespace monoeye {
 
 struct XrGeneratedDispatchTable {
+    PFN_xrGetInstanceProcAddr nextGetInstanceProcAddr = nullptr;
+
 """)
 
         for cmd_name, cmd_info in sorted(commands.items()):
-            member_name = cmd_name[2:]
-            f.write(f"    PFN_xrVoidFunction {member_name} = nullptr;\n")
+            f.write(f"    PFN_xrVoidFunction {cmd_name} = nullptr;\n")
+
 
         f.write("""};
 
 // Helper macro to call a dispatch function with proper casting
 // Usage: MONOEYE_CALL_DISPATCH(dispatch, xrBeginFrame, (session, &frameBeginInfo))
 #define MONOEYE_CALL_DISPATCH(dispatch, fn, args) \\
-    ((PFN_##fn)(dispatch)->##fn##_2)(args)
+    ((PFN_##fn)(dispatch)->fn)(args)
+
 
 } // namespace monoeye
 """)
@@ -133,9 +168,9 @@ void GeneratedXrPopulateDispatchTable(
 """)
 
         for cmd_name, cmd_info in sorted(commands.items()):
-            member_name = cmd_name[2:]
             f.write(f'\n    get_instance_proc_addr(instance, "{cmd_name}", &proc_addr);\n')
-            f.write(f"    dispatch_table->{member_name} = proc_addr;\n")
+            f.write(f"    dispatch_table->{cmd_name} = proc_addr;\n")
+
 
         f.write("""
 }
