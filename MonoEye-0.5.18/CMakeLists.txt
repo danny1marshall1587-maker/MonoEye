@@ -158,9 +158,14 @@ set(MONOEYE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui/imgui_widgets.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui/imgui_tables.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui/imgui_impl_vulkan.cpp
-    $<$<PLATFORM_ID:Windows>:${CMAKE_CURRENT_SOURCE_DIR}/external/imgui/imgui_impl_dx11.cpp>
-    $<$<PLATFORM_ID:Windows>:${CMAKE_CURRENT_SOURCE_DIR}/external/imgui/imgui_impl_dx12.cpp>
 )
+
+if(WIN32)
+    list(APPEND MONOEYE_SOURCES
+        ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui/imgui_impl_dx11.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui/imgui_impl_dx12.cpp
+    )
+endif()
 
 # Build the API layer shared library
 add_library(monoeye SHARED
@@ -184,9 +189,9 @@ if(WIN32)
     target_include_directories(openvr_api PRIVATE external/openvr/headers)
     target_link_libraries(openvr_api PRIVATE Vulkan::Vulkan)
     target_compile_definitions(openvr_api PRIVATE
-        $<$<PLATFORM_ID:Windows>:VK_USE_PLATFORM_WIN32_KHR>
-        $<$<PLATFORM_ID:Windows>:_CRT_SECURE_NO_WARNINGS>
-        $<$<PLATFORM_ID:Windows>:NOMINMAX>
+        VK_USE_PLATFORM_WIN32_KHR
+        _CRT_SECURE_NO_WARNINGS
+        NOMINMAX
     )
     set_target_properties(openvr_api PROPERTIES PREFIX "") # Remove 'lib' prefix
 endif()
