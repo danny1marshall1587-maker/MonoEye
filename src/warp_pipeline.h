@@ -3,20 +3,8 @@
 
 #pragma once
 
-#ifdef _WIN32
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
-#endif
-
-#ifndef XR_USE_GRAPHICS_API_VULKAN
-#define XR_USE_GRAPHICS_API_VULKAN
-#endif
-
+#include "layer.h"
 #include <vulkan/vulkan.h>
-#include <openxr/openxr.h>
-#include <openxr/openxr_platform.h>
 
 #include <mutex>
 #include <vector>
@@ -29,6 +17,8 @@ struct SwapchainImageInfo;
 class WarpPipeline {
 public:
     static WarpPipeline& get_instance();
+    WarpPipeline();
+    ~WarpPipeline();
 
     // Initialize with Vulkan device from the OpenXR session
     VkResult initialize(
@@ -46,8 +36,12 @@ public:
     VkResult execute_warp(
         SwapchainImageInfo* leftColor,
         SwapchainImageInfo* leftDepth,
+        SwapchainImageInfo* leftMotion,
         SwapchainImageInfo* rightColor,
-        XrTime displayTime
+        XrTime displayTime,
+        VkSemaphore externalSemaphore = VK_NULL_HANDLE,
+        uint32_t srcLayerIndex = 0,
+        uint32_t dstLayerIndex = 0
     );
 
     // Wait for any pending warp operations to complete
@@ -56,9 +50,24 @@ public:
     // Check if initialized
     bool is_initialized() const { return m_initialized; }
 
+    VkInstance get_vk_instance() const { return m_vkInstance; }
+    VkPhysicalDevice get_vk_physical_device() const { return m_vkPhysicalDevice; }
+    VkDevice get_vk_device() const { return m_vkDevice; }
+    VkQueue get_queue() const { return m_vkQueue; }
+
+    enum class UpscaleMode {
+        Native,
+        FSR_Performance,
+        FSR_Balanced,
+        FSR_Quality,
+        FSR_UltraQuality
+    };
+
+    void set_upscale_mode(UpscaleMode mode) { m_upscaleMode = mode; }
+    
 private:
-    WarpPipeline();
-    ~WarpPipeline();
+    UpscaleMode m_upscaleMode = UpscaleMode::Native;
+    float m_fsrSharpness = 0.8f;
 
     // Non-copyable
     WarpPipeline(const WarpPipeline&) = delete;
@@ -73,10 +82,12 @@ private:
     // Record the compute command buffer
     VkResult record_compute_command(
         VkImageView leftColorView,
-        VkImageView leftDepthView,
+        VkImageView leftEyeDepthView,
+        VkImageView leftMotionView,
         VkImageView rightColorView,
         uint32_t width,
-        uint32_t height
+        uint32_t height,
+        VkSemaphore externalSemaphore
     );
     
     // Ensure temporal buffer is allocated and matches dimensions
@@ -110,6 +121,7 @@ private:
     VkImage m_temporalImage = VK_NULL_HANDLE;
     VkDeviceMemory m_temporalMemory = VK_NULL_HANDLE;
     VkImageView m_temporalView = VK_NULL_HANDLE;
+    VkSampler m_sampler = VK_NULL_HANDLE;
     uint32_t m_temporalWidth = 0;
     uint32_t m_temporalHeight = 0;
 

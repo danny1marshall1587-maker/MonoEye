@@ -1,136 +1,234 @@
 // Copyright (c) 2026 MonoEye Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+#include "config.h"
+#include "dispatch_table.h"
 #include "layer.h"
 #include "logging.h"
-#include "dispatch_table.h"
+#include "overlay_manager.h"
 #include "swapchain_tracker.h"
 #include "warp_pipeline.h"
-#include "config.h"
-#include <vulkan/vulkan.h>
+#include "graphics_manager.h"
 #include <openxr/openxr_platform.h>
+#include <vulkan/vulkan.h>
 
 #include <mutex>
 #include <unordered_map>
 
 namespace monoeye {
 
+// Track which instance owns each session and its graphics API
 extern std::mutex s_session_map_mutex;
-extern std::unordered_map<XrSession, XrInstance> s_session_map;
+extern std::unordered_map<XrSession, SessionState> s_session_map;
 
-extern "C" XrResult monoeye_xrCreateSession(
-    XrInstance instance,
-    const XrSessionCreateInfo* createInfo,
-    XrSession* session
-) {
-    MONOEYE_LOG("xrCreateSession called");
+extern "C" XrResult XRAPI_CALL
+monoeye_xrCreateSession(XrInstance instance,
+                        const XrSessionCreateInfo *createInfo,
+                        XrSession *session) {
+  MONOEYE_LOG("xrCreateSession called");
 
-    XrGeneratedDispatchTable* dispatch = nullptr;
-    {
-        std::lock_guard<std::mutex> lock(g_instance_dispatch_mutex);
-        auto it = g_instance_dispatch_map.find(instance);
-        if (it != g_instance_dispatch_map.end()) {
-            dispatch = it->second;
+  XrGeneratedDispatchTable *dispatch = nullptr;
+  {
+    std::lock_guard<std::mutex> lock(g_instance_dispatch_mutex);
+    auto it = g_instance_dispatch_map.find(instance);
+    if (it != g_instance_dispatch_map.end()) {
+      dispatch = it->second;
+    }
+  }
+
+  if (!dispatch || !dispatch->xrCreateSession) {
+    MONOEYE_LOG_ERROR("No dispatch table or CreateSession function");
+    return XR_ERROR_RUNTIME_FAILURE;
+  }
+
+  // Call down to create the session
+  XrResult result = ((PFN_xrCreateSession)dispatch->xrCreateSession)(
+      instance, createInfo, session);
+
+  if (result != XR_SUCCESS) {
+    MONOEYE_LOG_ERROR("xrCreateSession failed: %d", result);
+    return result;
+  }
+
+  MONOEYE_LOG("Session created: %p", (void *)(uintptr_t)*session);
+
+  // Map session to instance and detect type
+  {
+    std::lock_guard<std::mutex> lock(s_session_map_mutex);
+    SessionState state = {instance, SESSION_UNKNOWN};
+    
+    if (createInfo && createInfo->next) {
+      const XrBaseInStructure *header =
+          reinterpret_cast<const XrBaseInStructure *>(createInfo->next);
+      while (header) {
+        if (header->type == XR_TYPE_GRAPHICS_BINDING_VULKAN2_KHR ||
+            header->type == XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR) {
+          state.type = SESSION_VULKAN;
+          MONOEYE_LOG("Vulkan session detected");
+          break;
+        } 
+#ifdef _WIN32
+        else if (header->type == XR_TYPE_GRAPHICS_BINDING_D3D11_KHR) {
+          state.type = SESSION_D3D11;
+          MONOEYE_LOG("DirectX 11 session detected (AC Evo / Legacy DX11)");
+          break;
+        } else if (header->type == XR_TYPE_GRAPHICS_BINDING_D3D12_KHR) {
+          state.type = SESSION_D3D12;
+          const XrGraphicsBindingD3D12KHR *db = reinterpret_cast<const XrGraphicsBindingD3D12KHR *>(header);
+          state.d3d12_device = db->device;
+          state.d3d12_queue = db->queue;
+          MONOEYE_LOG("DirectX 12 session detected (AC Evo / Modern DX12)");
+          break;
         }
+#endif
+        header = header->next;
+      }
     }
+    s_session_map[*session] = state;
+  }
 
-    if (!dispatch || !dispatch->CreateSession) {
-        MONOEYE_LOG_ERROR("No dispatch table or CreateSession function");
-        return XR_ERROR_RUNTIME_FAILURE;
-    }
+  // Initialize the Vulkan warp pipeline if enabled
+  const Config &config = get_config();
+  if (config.enabled && !config.bypass_mode) {
+    if (createInfo && createInfo->next) {
+      // Walk the next chain to find the Vulkan binding
+      const XrBaseInStructure *header =
+          reinterpret_cast<const XrBaseInStructure *>(createInfo->next);
+      while (header) {
+        if (header->type == XR_TYPE_GRAPHICS_BINDING_VULKAN2_KHR ||
+            header->type == XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR) {
 
-    // Call down to create the session
-    XrResult result = ((PFN_xrCreateSession)dispatch->CreateSession)(instance, createInfo, session);
+          const XrGraphicsBindingVulkan2KHR *vb =
+              reinterpret_cast<const XrGraphicsBindingVulkan2KHR *>(header);
 
-    if (result != XR_SUCCESS) {
-        MONOEYE_LOG_ERROR("xrCreateSession failed: %d", result);
-        return result;
-    }
+          MONOEYE_LOG(
+              "Vulkan session detected: device=%p, instance=%p, queueFamily=%u",
+              (void *)vb->device, (void *)vb->instance, vb->queueFamilyIndex);
 
-    MONOEYE_LOG("Session created: %p", (void*)(uintptr_t)*session);
+          // Get the physical device
+          VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+          XrVulkanGraphicsDeviceGetInfoKHR getInfo = {
+              XR_TYPE_VULKAN_GRAPHICS_DEVICE_GET_INFO_KHR};
+          getInfo.systemId = createInfo->systemId;
+          getInfo.vulkanInstance = vb->instance;
 
-    // Map session to instance for later lookups
-    {
-        std::lock_guard<std::mutex> lock(s_session_map_mutex);
-        s_session_map[*session] = instance;
-    }
+          if (dispatch->xrGetVulkanGraphicsDevice2KHR) {
+            ((PFN_xrGetVulkanGraphicsDevice2KHR)
+                 dispatch->xrGetVulkanGraphicsDevice2KHR)(instance, &getInfo,
+                                                          &physicalDevice);
+          } else if (dispatch->xrGetVulkanGraphicsDeviceKHR) {
+            ((PFN_xrGetVulkanGraphicsDeviceKHR)
+                 dispatch->xrGetVulkanGraphicsDeviceKHR)(
+                instance, createInfo->systemId, vb->instance, &physicalDevice);
+          }
 
-    // Initialize the Vulkan warp pipeline if enabled
-    const Config& config = get_config();
-    if (config.enabled && !config.bypass_mode) {
-        if (createInfo && createInfo->next) {
-            // Walk the next chain to find the Vulkan binding
-            const XrBaseInStructure* header = reinterpret_cast<const XrBaseInStructure*>(createInfo->next);
-            while (header) {
-                if (header->type == XR_TYPE_GRAPHICS_BINDING_VULKAN2_KHR ||
-                    header->type == XR_TYPE_GRAPHICS_BINDING_VULKAN_KHR) {
+          // Initialize the warp pipeline with this Vulkan device
+          WarpPipeline::get_instance().initialize(
+              vb->instance, physicalDevice, vb->device, vb->queueFamilyIndex);
 
-                    const XrGraphicsBindingVulkan2KHR* vb =
-                        reinterpret_cast<const XrGraphicsBindingVulkan2KHR*>(header);
+          // Initialize the overlay manager
+          OverlayManager::get_instance().initialize(
+              instance, *session, vb->device, physicalDevice,
+              vb->queueFamilyIndex, WarpPipeline::get_instance().get_queue());
 
-                    MONOEYE_LOG("Vulkan session detected: device=%p, instance=%p, queueFamily=%u",
-                        (void*)vb->device, (void*)vb->instance, vb->queueFamilyIndex);
-
-                    // Get the physical device
-                    VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
-                    XrVulkanGraphicsDeviceGetInfoKHR getInfo = {XR_TYPE_VULKAN_GRAPHICS_DEVICE_GET_INFO_KHR};
-                    getInfo.systemId = createInfo->systemId;
-                    getInfo.vulkanInstance = vb->instance;
-                    
-                    if (dispatch->GetVulkanGraphicsDevice2KHR) {
-                        ((PFN_xrGetVulkanGraphicsDevice2KHR)dispatch->GetVulkanGraphicsDevice2KHR)(
-                            instance, &getInfo, &physicalDevice);
-                    }
-
-                    // Initialize the warp pipeline with this Vulkan device
-                    WarpPipeline::get_instance().initialize(
-                        vb->instance,
-                        physicalDevice,
-                        vb->device,
-                        vb->queueFamilyIndex
-                    );
-
-                    break;
-                }
-                header = header->next;
-            }
+          break;
         }
-    }
+#ifdef _WIN32
+        else if (header->type == XR_TYPE_GRAPHICS_BINDING_D3D11_KHR ||
+                 header->type == XR_TYPE_GRAPHICS_BINDING_D3D12_KHR) {
+          
+          if (header->type == XR_TYPE_GRAPHICS_BINDING_D3D11_KHR) {
+            const XrGraphicsBindingD3D11KHR *db = reinterpret_cast<const XrGraphicsBindingD3D11KHR *>(header);
+            OverlayManager::get_instance().initializeD3D11(instance, *session, db->device);
+          } else {
+            const XrGraphicsBindingD3D12KHR *db = reinterpret_cast<const XrGraphicsBindingD3D12KHR *>(header);
+            OverlayManager::get_instance().initializeD3D12(instance, *session, db->device, db->queue);
+          }
 
-    return XR_SUCCESS;
+          // Initialize internal Vulkan context and WarpPipeline for D3D session interop
+          if (GraphicsManager::get_instance().ensure_initialized() == VK_SUCCESS) {
+            WarpPipeline::get_instance().initialize(
+                GraphicsManager::get_instance().get_vk_instance(),
+                GraphicsManager::get_instance().get_physical_device(),
+                GraphicsManager::get_instance().get_device(),
+                GraphicsManager::get_instance().get_queue_family()
+            );
+          }
+          break;
+        }
+#endif
+        header = header->next;
+      }
+    }
+  }
+
+  return XR_SUCCESS;
 }
 
-extern "C" XrResult monoeye_xrDestroySession(XrSession session) {
-    MONOEYE_LOG("xrDestroySession called: %p", (void*)(uintptr_t)session);
+extern "C" XrResult XRAPI_CALL monoeye_xrDestroySession(XrSession session) {
+  MONOEYE_LOG("xrDestroySession called: %p", (void *)(uintptr_t)session);
 
-    // Find the instance for this session
-    XrInstance instance = XR_NULL_HANDLE;
-    {
-        std::lock_guard<std::mutex> lock(s_session_map_mutex);
-        auto it = s_session_map.find(session);
-        if (it != s_session_map.end()) {
-            instance = it->second;
-            s_session_map.erase(it);
+  // Find the instance for this session
+  XrInstance instance = XR_NULL_HANDLE;
+  {
+    std::lock_guard<std::mutex> lock(s_session_map_mutex);
+    auto it = s_session_map.find(session);
+    if (it != s_session_map.end()) {
+      instance = it->second.instance;
+      s_session_map.erase(it);
+    }
+  }
+
+  // Shut down the warp pipeline
+  WarpPipeline::get_instance().shutdown();
+  OverlayManager::get_instance().shutdown();
+
+  XrGeneratedDispatchTable *dispatch = nullptr;
+  if (instance != XR_NULL_HANDLE) {
+    std::lock_guard<std::mutex> lock(g_instance_dispatch_mutex);
+    auto it = g_instance_dispatch_map.find(instance);
+    if (it != g_instance_dispatch_map.end()) {
+      dispatch = it->second;
+    }
+  }
+
+  if (!dispatch || !dispatch->xrDestroySession) {
+    return XR_ERROR_RUNTIME_FAILURE;
+  }
+
+  return ((PFN_xrDestroySession)dispatch->xrDestroySession)(session);
+}
+
+extern "C" XrResult XRAPI_CALL monoeye_xrLocateSpace(
+    XrSpace space,
+    XrSpace baseSpace,
+    XrTime time,
+    XrSpaceLocation* location
+) {
+    // We need an instance to get the dispatch table. 
+    // Since we don't track every space yet, we use the global pointer as a fallback.
+    if (!monoeye::g_nextGetInstanceProcAddr) return XR_ERROR_RUNTIME_FAILURE;
+
+    PFN_xrLocateSpace next_xrLocateSpace = nullptr;
+    monoeye::g_nextGetInstanceProcAddr(XR_NULL_HANDLE, "xrLocateSpace", (PFN_xrVoidFunction*)&next_xrLocateSpace);
+
+    if (!next_xrLocateSpace) return XR_ERROR_RUNTIME_FAILURE;
+
+    XrResult res = next_xrLocateSpace(space, baseSpace, time, location);
+
+    // REQUIREMENT 4: Interaction Motion Source Failsafe
+    // If the runtime fails to locate the space (e.g. unknown interaction source),
+    // we return XR_SUCCESS with tracking bits cleared to prevent the engine from stalling.
+    if (res != XR_SUCCESS && location) {
+        static int failsafe_count = 0;
+        if (failsafe_count++ % 1000 == 0) {
+            MONOEYE_LOG_WARN("xrLocateSpace failsafe triggered (res=%d). Bypassing unknown motion source.", res);
         }
+        location->locationFlags = 0; // Not tracked, but valid structure
+        return XR_SUCCESS;
     }
 
-    // Shut down the warp pipeline
-    WarpPipeline::get_instance().shutdown();
-
-    XrGeneratedDispatchTable* dispatch = nullptr;
-    if (instance != XR_NULL_HANDLE) {
-        std::lock_guard<std::mutex> lock(g_instance_dispatch_mutex);
-        auto it = g_instance_dispatch_map.find(instance);
-        if (it != g_instance_dispatch_map.end()) {
-            dispatch = it->second;
-        }
-    }
-
-    if (!dispatch || !dispatch->DestroySession) {
-        return XR_ERROR_RUNTIME_FAILURE;
-    }
-
-    return ((PFN_xrDestroySession)dispatch->DestroySession)(session);
+    return res;
 }
 
 } // namespace monoeye

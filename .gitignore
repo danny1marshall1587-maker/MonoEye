@@ -43,3 +43,5 @@ switcher-output/
 # Release packages
 *.zip
 release/
+powershell.bat
+
