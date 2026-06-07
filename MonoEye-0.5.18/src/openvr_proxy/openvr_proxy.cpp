@@ -3,44 +3,182 @@
 #include <windows.h>
 #endif
 #include <iostream>
+#include <mutex>
 #include "../logging.h"
 
 // Pointer to the real OpenVR DLL
 static HMODULE s_realOpenVR = nullptr;
+static std::mutex s_load_mutex;
 
 typedef void* (VR_CALLTYPE *PFN_VR_InitInternal)(vr::EVRInitError *peError, vr::EVRApplicationType eApplicationType);
+typedef uint32_t (VR_CALLTYPE *PFN_VR_InitInternal2)(vr::EVRInitError *peError, vr::EVRApplicationType eApplicationType, const char *pStartupInfo);
 typedef void (VR_CALLTYPE *PFN_VR_ShutdownInternal)();
 typedef bool (VR_CALLTYPE *PFN_VR_IsHmdPresent)();
+typedef bool (VR_CALLTYPE *PFN_VR_IsRuntimeInstalled)();
 typedef const char* (VR_CALLTYPE *PFN_VR_GetStringForHmdError)(vr::EVRInitError error);
+typedef const char* (VR_CALLTYPE *PFN_VR_GetVRInitErrorAsSymbol)(vr::EVRInitError error);
+typedef const char* (VR_CALLTYPE *PFN_VR_GetVRInitErrorAsEnglishDescription)(vr::EVRInitError error);
 typedef void* (VR_CALLTYPE *PFN_VR_GetGenericInterface)(const char *pchInterfaceVersion, vr::EVRInitError *peError);
+typedef bool (VR_CALLTYPE *PFN_VR_IsInterfaceVersionValid)(const char *pchInterfaceVersion);
+typedef uint32_t (VR_CALLTYPE *PFN_VR_GetInitToken)();
 
 static PFN_VR_InitInternal g_real_VR_InitInternal = nullptr;
+static PFN_VR_InitInternal2 g_real_VR_InitInternal2 = nullptr;
 static PFN_VR_ShutdownInternal g_real_VR_ShutdownInternal = nullptr;
 static PFN_VR_IsHmdPresent g_real_VR_IsHmdPresent = nullptr;
+static PFN_VR_IsRuntimeInstalled g_real_VR_IsRuntimeInstalled = nullptr;
 static PFN_VR_GetStringForHmdError g_real_VR_GetStringForHmdError = nullptr;
+static PFN_VR_GetVRInitErrorAsSymbol g_real_VR_GetVRInitErrorAsSymbol = nullptr;
+static PFN_VR_GetVRInitErrorAsEnglishDescription g_real_VR_GetVRInitErrorAsEnglishDescription = nullptr;
 static PFN_VR_GetGenericInterface g_real_VR_GetGenericInterface = nullptr;
+static PFN_VR_IsInterfaceVersionValid g_real_VR_IsInterfaceVersionValid = nullptr;
+static PFN_VR_GetInitToken g_real_VR_GetInitToken = nullptr;
 
 bool LoadRealOpenVR() {
+    std::lock_guard<std::mutex> lock(s_load_mutex);
     if (s_realOpenVR) return true;
 
-    // Load the real openvr_api.dll from a different name or path
-    s_realOpenVR = LoadLibraryA("openvr_api_real.dll");
+    // Use the suggested name for the original DLL
+    s_realOpenVR = LoadLibraryA("openvr_api_orig.dll");
     if (!s_realOpenVR) {
-        MONOEYE_LOG_ERROR("Failed to load real openvr_api_real.dll");
+        // Fallback to the old name just in case
+        s_realOpenVR = LoadLibraryA("openvr_api_real.dll");
+    }
+
+    if (!s_realOpenVR) {
+        // We cannot log here if the logging system isn't ready or depends on this DLL
         return false;
     }
 
     g_real_VR_InitInternal = (PFN_VR_InitInternal)GetProcAddress(s_realOpenVR, "VR_InitInternal");
+    g_real_VR_InitInternal2 = (PFN_VR_InitInternal2)GetProcAddress(s_realOpenVR, "VR_InitInternal2");
     g_real_VR_ShutdownInternal = (PFN_VR_ShutdownInternal)GetProcAddress(s_realOpenVR, "VR_ShutdownInternal");
     g_real_VR_IsHmdPresent = (PFN_VR_IsHmdPresent)GetProcAddress(s_realOpenVR, "VR_IsHmdPresent");
+    g_real_VR_IsRuntimeInstalled = (PFN_VR_IsRuntimeInstalled)GetProcAddress(s_realOpenVR, "VR_IsRuntimeInstalled");
     g_real_VR_GetStringForHmdError = (PFN_VR_GetStringForHmdError)GetProcAddress(s_realOpenVR, "VR_GetStringForHmdError");
+    g_real_VR_GetVRInitErrorAsSymbol = (PFN_VR_GetVRInitErrorAsSymbol)GetProcAddress(s_realOpenVR, "VR_GetVRInitErrorAsSymbol");
+    g_real_VR_GetVRInitErrorAsEnglishDescription = (PFN_VR_GetVRInitErrorAsEnglishDescription)GetProcAddress(s_realOpenVR, "VR_GetVRInitErrorAsEnglishDescription");
     g_real_VR_GetGenericInterface = (PFN_VR_GetGenericInterface)GetProcAddress(s_realOpenVR, "VR_GetGenericInterface");
+    g_real_VR_IsInterfaceVersionValid = (PFN_VR_IsInterfaceVersionValid)GetProcAddress(s_realOpenVR, "VR_IsInterfaceVersionValid");
+    g_real_VR_GetInitToken = (PFN_VR_GetInitToken)GetProcAddress(s_realOpenVR, "VR_GetInitToken");
 
     return true;
 }
 
+namespace monoeye {
+
+// Static instance of our proxy compositor
+static ProxyCompositor* s_proxyCompositor = nullptr;
+static ProxyCompositor_026* s_proxyCompositor_026 = nullptr;
+static std::mutex s_proxy_mutex;
+
+vr::EVRCompositorError ProxyCompositor::Submit(vr::EVREye eEye, const vr::Texture_t *pTexture, const vr::VRTextureBounds_t* pBounds, vr::EVRSubmitFlags nSubmitFlags) {
+    // Lazy initialization diagnostic on first submit
+    static bool s_warp_initialized = false;
+    if (!s_warp_initialized && pTexture) {
+        MONOEYE_LOG("OpenVR Proxy: First Submit called, initializing warp pipeline...");
+        MONOEYE_LOG("OpenVR Proxy: Texture eType=%d (0=DX11, 1=GL, 2=Vulkan, 3=DX12)",
+                    (int)pTexture->eType);
+        s_warp_initialized = true;
+    }
+
+    if (eEye == vr::Eye_Left) {
+        // Save the left eye for right-eye synthesis
+        if (pTexture) {
+            m_lastLeftTexture = *pTexture;
+            m_hasLeftTexture  = true;
+        }
+        m_lastLeftBounds = pBounds ? *pBounds : vr::VRTextureBounds_t{0.0f, 0.0f, 1.0f, 1.0f};
+        m_leftFlags      = nSubmitFlags;
+
+        MONOEYE_LOG("OpenVR Proxy: LEFT eye submit, eType=%d, handle=%p, flags=0x%x",
+                    pTexture ? (int)pTexture->eType : -1,
+                    pTexture ? pTexture->handle : nullptr,
+                    (unsigned)nSubmitFlags);
+
+        vr::EVRCompositorError err = m_real->Submit(eEye, pTexture, pBounds, nSubmitFlags);
+        if (err != vr::VRCompositorError_None) {
+            MONOEYE_LOG("OpenVR Proxy: LEFT eye real compositor returned ERROR %d", (int)err);
+        }
+        return err;
+
+    } else if (eEye == vr::Eye_Right) {
+        // Suppress the game's native right-eye submit.
+        // Instead, re-submit the saved left-eye texture as the right eye.
+        // This produces a flat (non-warped) stereo view — both eyes see the same
+        // mono image — which confirms the submit pipeline is working.
+        if (m_hasLeftTexture) {
+            MONOEYE_LOG("OpenVR Proxy: RIGHT eye SYNTHESIZED from left (mono->stereo)");
+            vr::EVRCompositorError err = m_real->Submit(
+                vr::Eye_Right, &m_lastLeftTexture, &m_lastLeftBounds, m_leftFlags);
+            if (err != vr::VRCompositorError_None) {
+                MONOEYE_LOG("OpenVR Proxy: RIGHT eye synthetic compositor returned ERROR %d", (int)err);
+            }
+            return err;
+        } else {
+            // Fallback: no left eye saved yet, pass through unchanged
+            MONOEYE_LOG("OpenVR Proxy: RIGHT eye — no left saved yet, passing through");
+            return m_real->Submit(eEye, pTexture, pBounds, nSubmitFlags);
+        }
+    }
+
+    return m_real->Submit(eEye, pTexture, pBounds, nSubmitFlags);
+}
+
+vr::EVRCompositorError ProxyCompositor_026::Submit(vr::EVREye eEye, const vr::Texture_t *pTexture, const vr::VRTextureBounds_t* pBounds, vr::EVRSubmitFlags nSubmitFlags) {
+    // Lazy initialization diagnostic on first submit
+    static bool s_warp_initialized = false;
+    if (!s_warp_initialized && pTexture) {
+        MONOEYE_LOG("OpenVR Proxy 026: First Submit called — LMU pipeline active");
+        MONOEYE_LOG("OpenVR Proxy 026: Texture eType=%d (0=DX11, 1=GL, 2=Vulkan, 3=DX12)",
+                    (int)pTexture->eType);
+        s_warp_initialized = true;
+    }
+
+    if (eEye == vr::Eye_Left) {
+        // Save the left eye for right-eye synthesis
+        if (pTexture) {
+            m_lastLeftTexture = *pTexture;
+            m_hasLeftTexture  = true;
+        }
+        m_lastLeftBounds = pBounds ? *pBounds : vr::VRTextureBounds_t{0.0f, 0.0f, 1.0f, 1.0f};
+        m_leftFlags      = nSubmitFlags;
+
+        MONOEYE_LOG("OpenVR Proxy 026: LEFT eye submit, eType=%d, handle=%p, flags=0x%x",
+                    pTexture ? (int)pTexture->eType : -1,
+                    pTexture ? pTexture->handle : nullptr,
+                    (unsigned)nSubmitFlags);
+
+        vr::EVRCompositorError err = m_real->Submit(eEye, pTexture, pBounds, nSubmitFlags);
+        if (err != vr::VRCompositorError_None) {
+            MONOEYE_LOG("OpenVR Proxy 026: LEFT eye real compositor returned ERROR %d", (int)err);
+        }
+        return err;
+
+    } else if (eEye == vr::Eye_Right) {
+        // Suppress the game's native right-eye submit.
+        // Re-submit the saved left-eye texture as the right eye for flat stereo view.
+        if (m_hasLeftTexture) {
+            MONOEYE_LOG("OpenVR Proxy 026: RIGHT eye SYNTHESIZED from left (mono->stereo)");
+            vr::EVRCompositorError err = m_real->Submit(
+                vr::Eye_Right, &m_lastLeftTexture, &m_lastLeftBounds, m_leftFlags);
+            if (err != vr::VRCompositorError_None) {
+                MONOEYE_LOG("OpenVR Proxy 026: RIGHT eye synthetic compositor returned ERROR %d", (int)err);
+            }
+            return err;
+        } else {
+            // Fallback: no left eye saved yet, pass through unchanged
+            MONOEYE_LOG("OpenVR Proxy 026: RIGHT eye — no left saved yet, passing through");
+            return m_real->Submit(eEye, pTexture, pBounds, nSubmitFlags);
+        }
+    }
+
+    return m_real->Submit(eEye, pTexture, pBounds, nSubmitFlags);
+}
+
+} // namespace monoeye
+
 extern "C" __declspec(dllexport) void* VR_CALLTYPE VR_InitInternal(vr::EVRInitError *peError, vr::EVRApplicationType eApplicationType) {
-    MONOEYE_LOG("OpenVR Proxy: VR_InitInternal called");
     if (!LoadRealOpenVR()) {
         if (peError) *peError = vr::VRInitError_Init_FileNotFound;
         return nullptr;
@@ -48,29 +186,83 @@ extern "C" __declspec(dllexport) void* VR_CALLTYPE VR_InitInternal(vr::EVRInitEr
     return g_real_VR_InitInternal(peError, eApplicationType);
 }
 
+extern "C" __declspec(dllexport) uint32_t VR_CALLTYPE VR_InitInternal2(vr::EVRInitError *peError, vr::EVRApplicationType eApplicationType, const char *pStartupInfo) {
+    if (!LoadRealOpenVR()) {
+        if (peError) *peError = vr::VRInitError_Init_FileNotFound;
+        return 0;
+    }
+    if (!g_real_VR_InitInternal2) return 0;
+    return g_real_VR_InitInternal2(peError, eApplicationType, pStartupInfo);
+}
+
 extern "C" __declspec(dllexport) void VR_CALLTYPE VR_ShutdownInternal() {
-    MONOEYE_LOG("OpenVR Proxy: VR_ShutdownInternal called");
     if (g_real_VR_ShutdownInternal) g_real_VR_ShutdownInternal();
 }
 
 extern "C" __declspec(dllexport) bool VR_CALLTYPE VR_IsHmdPresent() {
     if (!LoadRealOpenVR()) return false;
+    if (!g_real_VR_IsHmdPresent) return false;
     return g_real_VR_IsHmdPresent();
+}
+
+extern "C" __declspec(dllexport) bool VR_CALLTYPE VR_IsRuntimeInstalled() {
+    if (!LoadRealOpenVR()) return false;
+    if (!g_real_VR_IsRuntimeInstalled) return false;
+    return g_real_VR_IsRuntimeInstalled();
 }
 
 extern "C" __declspec(dllexport) const char* VR_CALLTYPE VR_GetStringForHmdError(vr::EVRInitError error) {
     if (!LoadRealOpenVR()) return "MonoEye: Real OpenVR not found";
+    if (!g_real_VR_GetStringForHmdError) return "Unknown Error";
     return g_real_VR_GetStringForHmdError(error);
+}
+
+extern "C" __declspec(dllexport) const char* VR_CALLTYPE VR_GetVRInitErrorAsSymbol(vr::EVRInitError error) {
+    if (!LoadRealOpenVR()) return "VRInitError_Unknown";
+    if (!g_real_VR_GetVRInitErrorAsSymbol) return "VRInitError_Unknown";
+    return g_real_VR_GetVRInitErrorAsSymbol(error);
+}
+
+extern "C" __declspec(dllexport) const char* VR_CALLTYPE VR_GetVRInitErrorAsEnglishDescription(vr::EVRInitError error) {
+    if (!LoadRealOpenVR()) return "Real OpenVR not found";
+    if (!g_real_VR_GetVRInitErrorAsEnglishDescription) return "Unknown Error";
+    return g_real_VR_GetVRInitErrorAsEnglishDescription(error);
 }
 
 extern "C" __declspec(dllexport) void* VR_CALLTYPE VR_GetGenericInterface(const char *pchInterfaceVersion, vr::EVRInitError *peError) {
     if (!LoadRealOpenVR()) return nullptr;
-    
-    MONOEYE_LOG("OpenVR Proxy: Requesting interface %s", pchInterfaceVersion);
+    if (!g_real_VR_GetGenericInterface) return nullptr;
     
     void* iface = g_real_VR_GetGenericInterface(pchInterfaceVersion, peError);
-    
-    // This is where we will wrap IVRCompositor and IVRSystem
+    if (!iface) return nullptr;
+
+    // Wrap the compositor if requested
+    if (strcmp(pchInterfaceVersion, "IVRCompositor_026") == 0) {
+        if (!monoeye::s_proxyCompositor_026) {
+            MONOEYE_LOG("OpenVR Proxy: Creating strict 026 compositor wrapper for %s", pchInterfaceVersion);
+            monoeye::s_proxyCompositor_026 = new monoeye::ProxyCompositor_026((monoeye::IVRCompositor_026_VTable*)iface);
+        }
+        return monoeye::s_proxyCompositor_026;
+    }
+    else if (strstr(pchInterfaceVersion, "IVRCompositor_")) {
+        if (!monoeye::s_proxyCompositor) {
+            MONOEYE_LOG("OpenVR Proxy: Creating compositor wrapper for %s", pchInterfaceVersion);
+            monoeye::s_proxyCompositor = new monoeye::ProxyCompositor((vr::IVRCompositor*)iface);
+        }
+        return monoeye::s_proxyCompositor;
+    }
     
     return iface;
+}
+
+extern "C" __declspec(dllexport) bool VR_CALLTYPE VR_IsInterfaceVersionValid(const char *pchInterfaceVersion) {
+    if (!LoadRealOpenVR()) return false;
+    if (!g_real_VR_IsInterfaceVersionValid) return false;
+    return g_real_VR_IsInterfaceVersionValid(pchInterfaceVersion);
+}
+
+extern "C" __declspec(dllexport) uint32_t VR_CALLTYPE VR_GetInitToken() {
+    if (!LoadRealOpenVR()) return 0;
+    if (!g_real_VR_GetInitToken) return 0;
+    return g_real_VR_GetInitToken();
 }

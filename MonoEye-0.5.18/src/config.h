@@ -24,6 +24,9 @@ struct Config {
     // Use NVIDIA Tensor Cores for advanced stabilization (requires NVIDIA GPU)
     bool tensor_stabilization = false;
 
+    // Enable AI-powered Temporal Frame Generation
+    bool frame_gen_enabled = false;
+
     // Remove specular shimmering (fireflies)
     bool specular_rejection = true;
 

@@ -1,7 +1,12 @@
 using System;
 using System.Drawing;
 using System.Windows.Forms;
-using Microsoft.Win32;
+using Microsoft.Win32;using System.IO;
+using System.IO.Pipes;
+using System.Security.AccessControl;
+using System.Security.Principal;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace MonoEyeSwitcher
 {
@@ -12,6 +17,7 @@ namespace MonoEyeSwitcher
         private ComboBox leftEyeComboBox;
         private CheckBox indicatorCheckbox;
         private CheckBox tensorCheckbox;
+        private CheckBox frameGenCheckbox;
         private CheckBox specularCheckbox;
         private CheckBox edgeCheckbox;
         private GroupBox simRacingGroupBox;
@@ -32,18 +38,29 @@ namespace MonoEyeSwitcher
         private Label gameFolderLabel;
         private Button saveButton;
 
+        private TextBox consoleTextBox;
+        private Label pipeStatusLabel;
+        private CancellationTokenSource pipeCts;
+
         private bool isEnabled = false;
 
         public MainForm()
         {
             InitializeComponent();
             UpdateStatus();
+            StartPipeServer();
+        }
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            pipeCts?.Cancel();
+            base.OnFormClosing(e);
         }
 
         private void InitializeComponent()
         {
-            this.Text = "MonoEye Switcher v0.5.19 (Alpha)";
-            this.Size = new Size(420, 560);
+            this.Text = "MonoEye Switcher v0.5.71 (Alpha)";
+            this.Size = new Size(820, 960);
             this.FormBorderStyle = FormBorderStyle.FixedSingle;
             this.MaximizeBox = false;
             this.StartPosition = FormStartPosition.CenterScreen;
@@ -192,7 +209,7 @@ namespace MonoEyeSwitcher
                 Text = "v3 Advanced Clarity (Experimental)",
                 ForeColor = Color.FromArgb(0, 150, 220),
                 Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-                Size = new Size(360, 130),
+                Size = new Size(360, 160),
                 Location = new Point(20, 370)
             };
             this.Controls.Add(v3Group);
@@ -208,12 +225,23 @@ namespace MonoEyeSwitcher
             };
             v3Group.Controls.Add(tensorCheckbox);
 
+            frameGenCheckbox = new CheckBox
+            {
+                Text = "Temporal Frame Generation (Experimental)",
+                ForeColor = Color.FromArgb(0, 255, 200),
+                Font = new Font("Segoe UI", 8.5F),
+                Location = new Point(15, 55),
+                AutoSize = true,
+                Checked = false
+            };
+            v3Group.Controls.Add(frameGenCheckbox);
+
             specularCheckbox = new CheckBox
             {
                 Text = "Specular De-Shimmer (Input Cleaning)",
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 8.5F),
-                Location = new Point(15, 55),
+                Location = new Point(15, 85),
                 AutoSize = true,
                 Checked = true
             };
@@ -224,7 +252,7 @@ namespace MonoEyeSwitcher
                 Text = "Glass-Edge Smoothing (Depth-Masked AA)",
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI", 8.5F),
-                Location = new Point(15, 85),
+                Location = new Point(15, 115),
                 AutoSize = true,
                 Checked = true
             };
@@ -324,7 +352,7 @@ namespace MonoEyeSwitcher
                 Text = "Diagnostics & Logging",
                 ForeColor = Color.FromArgb(0, 255, 150),
                 Font = new Font("Segoe UI", 9F, FontStyle.Bold),
-                Size = new Size(360, 130),
+                Size = new Size(360, 165),
                 Location = new Point(20, 800)
             };
             this.Controls.Add(diagnosticsGroupBox);
@@ -385,7 +413,123 @@ namespace MonoEyeSwitcher
             };
             diagnosticsGroupBox.Controls.Add(logInfoLabel);
 
-            this.Size = new Size(415, 960);
+            Button diagnoseButton = new Button
+            {
+                Text = "Diagnose Layer Registration",
+                Size = new Size(330, 28),
+                Font = new Font("Segoe UI", 8F, FontStyle.Bold),
+                BackColor = Color.FromArgb(40, 60, 80),
+                ForeColor = Color.FromArgb(0, 220, 255),
+                FlatStyle = FlatStyle.Flat,
+                Location = new Point(15, 130)
+            };
+            diagnoseButton.FlatAppearance.BorderColor = Color.FromArgb(0, 150, 200);
+            diagnoseButton.Click += DiagnoseButton_Click;
+            diagnosticsGroupBox.Controls.Add(diagnoseButton);
+
+            // --- Real-time Console Section ---
+            GroupBox consoleGroupBox = new GroupBox
+            {
+                Text = "Live Diagnostics Console",
+                ForeColor = Color.FromArgb(0, 255, 150),
+                Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                Size = new Size(370, 895),
+                Location = new Point(410, 15)
+            };
+            this.Controls.Add(consoleGroupBox);
+
+            // IPC pipe connection status indicator
+            pipeStatusLabel = new Label
+            {
+                Text = "● IPC: Waiting for DLL...",
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
+                ForeColor = Color.Gray,
+                AutoSize = true,
+                Location = new Point(15, 26)
+            };
+            consoleGroupBox.Controls.Add(pipeStatusLabel);
+
+            consoleTextBox = new TextBox
+            {
+                Multiline = true,
+                ReadOnly = true,
+                ScrollBars = ScrollBars.Vertical,
+                BackColor = Color.FromArgb(10, 10, 10),
+                ForeColor = Color.LightGreen,
+                Font = new Font("Consolas", 8F),
+                Size = new Size(340, 838),
+                Location = new Point(15, 47)
+            };
+            consoleGroupBox.Controls.Add(consoleTextBox);
+
+            this.Size = new Size(820, 960);
+        }
+
+        private void StartPipeServer()
+        {
+            pipeCts = new CancellationTokenSource();
+            Task.Run(() => PipeServerLoop(pipeCts.Token));
+        }
+
+        private async Task PipeServerLoop(CancellationToken token)
+        {
+            while (!token.IsCancellationRequested)
+            {
+                try
+                {
+                    PipeSecurity ps = new PipeSecurity();
+                    ps.AddAccessRule(new PipeAccessRule(new SecurityIdentifier(WellKnownSidType.WorldSid, null), PipeAccessRights.ReadWrite, AccessControlType.Allow));
+
+                    using (var pipeServer = NamedPipeServerStreamAcl.Create("MonoEyeLogs", PipeDirection.In, 1, PipeTransmissionMode.Byte, PipeOptions.Asynchronous, 0, 0, ps))
+                    {
+                        await pipeServer.WaitForConnectionAsync(token);
+
+                        Invoke((MethodInvoker)delegate
+                        {
+                            if (consoleTextBox.TextLength > 10000) consoleTextBox.Clear();
+                            consoleTextBox.AppendText($"\r\n[{DateTime.Now:HH:mm:ss}] === IPC CONNECTION ESTABLISHED ===\r\n");
+                            pipeStatusLabel.Text = "● IPC: DLL Connected";
+                            pipeStatusLabel.ForeColor = Color.FromArgb(0, 220, 100);
+                        });
+
+                        using (var reader = new StreamReader(pipeServer))
+                        {
+                            while (!token.IsCancellationRequested && pipeServer.IsConnected)
+                            {
+                                string line = await reader.ReadLineAsync();
+                                if (line == null) break; // Client disconnected
+
+                                Invoke((MethodInvoker)delegate
+                                {
+                                    if (consoleTextBox.TextLength > 50000) consoleTextBox.Text = consoleTextBox.Text.Substring(10000);
+                                    consoleTextBox.AppendText(line + "\r\n");
+                                    consoleTextBox.SelectionStart = consoleTextBox.Text.Length;
+                                    consoleTextBox.ScrollToCaret();
+                                });
+                            }
+                        }
+
+                        Invoke((MethodInvoker)delegate
+                        {
+                            consoleTextBox.AppendText($"[{DateTime.Now:HH:mm:ss}] === IPC CONNECTION CLOSED ===\r\n");
+                            pipeStatusLabel.Text = "● IPC: DLL Disconnected (game closed)";
+                            pipeStatusLabel.ForeColor = Color.Orange;
+                        });
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    Invoke((MethodInvoker)delegate
+                    {
+                        consoleTextBox.AppendText($"[Pipe Error] {ex.Message}\r\n");
+                    });
+                    await Task.Delay(2000, token); // delay before retry
+                }
+            }
         }
 
         private void UpdateStatus()
@@ -523,6 +667,7 @@ namespace MonoEyeSwitcher
             Environment.SetEnvironmentVariable("MONOEYE_LEFT_EYE", leftEyeMode, EnvironmentVariableTarget.Machine);
             Environment.SetEnvironmentVariable("MONOEYE_INDICATOR", indicatorMode, EnvironmentVariableTarget.Machine);
             Environment.SetEnvironmentVariable("MONOEYE_TENSOR_STABILIZATION", tensorCheckbox.Checked ? "1" : "0", EnvironmentVariableTarget.Machine);
+            Environment.SetEnvironmentVariable("MONOEYE_FRAME_GEN", frameGenCheckbox.Checked ? "1" : "0", EnvironmentVariableTarget.Machine);
             Environment.SetEnvironmentVariable("MONOEYE_SPECULAR_REJECTION", specularCheckbox.Checked ? "1" : "0", EnvironmentVariableTarget.Machine);
             Environment.SetEnvironmentVariable("MONOEYE_EDGE_SMOOTHING", edgeCheckbox.Checked ? "1" : "0", EnvironmentVariableTarget.Machine);
             Environment.SetEnvironmentVariable("MONOEYE_LOG_ENABLED", loggingCheckbox.Checked ? "1" : "0", EnvironmentVariableTarget.Machine);
@@ -536,26 +681,30 @@ namespace MonoEyeSwitcher
             if (enable)
             {
                 string jsonPath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "XR_APILAYER_NOVENDOR_monoeye.json");
-                string subKey = @"SOFTWARE\Khronos\OpenXR\1\ApiLayers\Implicit";
+                string[] keys = {
+                    @"SOFTWARE\Khronos\OpenXR\1\ApiLayers\Implicit",
+                    @"SOFTWARE\WOW6432Node\Khronos\OpenXR\1\ApiLayers\Implicit"
+                };
 
-                try
+                foreach (string subKey in keys)
                 {
-                    // Prefer HKLM for stability/EAC compliance
-                    using (RegistryKey key = Registry.LocalMachine.CreateSubKey(subKey))
+                    try
                     {
-                        key.SetValue(jsonPath, 0, RegistryValueKind.DWord);
-                    }
-                }
-                catch (Exception)
-                {
-                    // Fallback to HKCU if no admin
-                    try {
-                        using (RegistryKey key = Registry.CurrentUser.CreateSubKey(subKey))
+                        // Prefer HKLM for stability/EAC compliance
+                        using (RegistryKey key = Registry.LocalMachine.CreateSubKey(subKey))
                         {
                             key.SetValue(jsonPath, 0, RegistryValueKind.DWord);
                         }
-                    } catch (Exception ex) {
-                        MessageBox.Show("Failed to register OpenXR layer: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                    catch (Exception)
+                    {
+                        // Fallback to HKCU if no admin
+                        try {
+                            using (RegistryKey key = Registry.CurrentUser.CreateSubKey(subKey))
+                            {
+                                key.SetValue(jsonPath, 0, RegistryValueKind.DWord);
+                            }
+                        } catch { }
                     }
                 }
             }
@@ -660,17 +809,20 @@ namespace MonoEyeSwitcher
                 {
                     string path = fbd.SelectedPath;
                     string targetDll = System.IO.Path.Combine(path, "openvr_api.dll");
-                    string backupDll = System.IO.Path.Combine(path, "openvr_api_real.dll");
+                    string backupDll = System.IO.Path.Combine(path, "openvr_api_orig.dll");
 
                     if (System.IO.File.Exists(targetDll))
                     {
-                        try {
-                            // 1. Backup original if not already done
+                        try
+                        {
+                            // If backup doesn't exist, create it from the current target
                             if (!System.IO.File.Exists(backupDll)) {
                                 System.IO.File.Move(targetDll, backupDll);
+                            } else {
+                                // If backup exists, we can safely overwrite the target
+                                System.IO.File.Delete(targetDll);
                             }
 
-                            // 2. Copy our proxy (Assuming it's in the same folder as the switcher)
                             string proxySource = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "openvr_api.dll");
                             if (System.IO.File.Exists(proxySource)) {
                                 System.IO.File.Copy(proxySource, targetDll, true);
@@ -698,7 +850,16 @@ namespace MonoEyeSwitcher
 
                 if (!System.IO.File.Exists(sourceLog))
                 {
-                    MessageBox.Show("No log file found. Please run a game with logging enabled first.", "MonoEye Switcher", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    // The DLL creates this file the moment it is loaded by any OpenXR game.
+                    // If it doesn't exist: the DLL was never loaded (layer registration issue).
+                    System.IO.Directory.CreateDirectory(monoeyePath);
+                    var result = MessageBox.Show(
+                        $"No log file found at:\n{sourceLog}\n\nThis means the MonoEye DLL was NOT loaded by the game.\n\nPossible causes:\n  1. The registry path to the JSON is wrong\n  2. The DLL and JSON are in different folders\n  3. The layer is disabled\n\nOpen the MonoEye folder to inspect?",
+                        "MonoEye - DLL Not Loaded",
+                        MessageBoxButtons.YesNo,
+                        MessageBoxIcon.Warning);
+                    if (result == DialogResult.Yes)
+                        System.Diagnostics.Process.Start("explorer.exe", monoeyePath);
                     return;
                 }
 
@@ -722,6 +883,104 @@ namespace MonoEyeSwitcher
             {
                 MessageBox.Show($"Failed to save log: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        private void DiagnoseButton_Click(object sender, EventArgs e)
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("=== MonoEye Layer Registration Diagnosis ===\n");
+
+            string[] regKeys = {
+                @"SOFTWARE\Khronos\OpenXR\1\ApiLayers\Implicit",
+                @"SOFTWARE\WOW6432Node\Khronos\OpenXR\1\ApiLayers\Implicit"
+            };
+
+            bool foundAny = false;
+            foreach (var hive in new[] { "HKLM", "HKCU" })
+            {
+                foreach (var subKey in regKeys)
+                {
+                    try
+                    {
+                        RegistryKey root = hive == "HKLM" ? Registry.LocalMachine : Registry.CurrentUser;
+                        using (RegistryKey key = root.OpenSubKey(subKey))
+                        {
+                            if (key == null) continue;
+                            foreach (string valueName in key.GetValueNames())
+                            {
+                                if (valueName.IndexOf("monoeye", StringComparison.OrdinalIgnoreCase) < 0) continue;
+                                foundAny = true;
+                                int disabled = Convert.ToInt32(key.GetValue(valueName));
+                                sb.AppendLine($"[{hive}\\{subKey}]");
+                                sb.AppendLine($"  Registered JSON path: {valueName}");
+                                sb.AppendLine($"  Disabled flag: {disabled} ({(disabled == 0 ? "ENABLED" : "DISABLED")})");
+
+                                bool jsonExists = System.IO.File.Exists(valueName);
+                                sb.AppendLine($"  JSON file exists: {(jsonExists ? "YES ✓" : "NO ✘ <-- PROBLEM")}");
+
+                                if (jsonExists)
+                                {
+                                    try
+                                    {
+                                        string jsonContent = System.IO.File.ReadAllText(valueName);
+                                        string jsonDir = System.IO.Path.GetDirectoryName(valueName);
+
+                                        // Extract library_path from JSON
+                                        int idx = jsonContent.IndexOf("library_path");
+                                        if (idx >= 0)
+                                        {
+                                            int q1 = jsonContent.IndexOf('"', idx + 14);
+                                            int q2 = jsonContent.IndexOf('"', q1 + 1);
+                                            if (q1 >= 0 && q2 > q1)
+                                            {
+                                                string libPath = jsonContent.Substring(q1 + 1, q2 - q1 - 1);
+                                                string resolvedDll = System.IO.Path.IsPathRooted(libPath)
+                                                    ? libPath
+                                                    : System.IO.Path.Combine(jsonDir, libPath.TrimStart('.', '\\', '/'));
+                                                bool dllExists = System.IO.File.Exists(resolvedDll);
+                                                sb.AppendLine($"  DLL path in JSON: {libPath}");
+                                                sb.AppendLine($"  Resolved DLL path: {resolvedDll}");
+                                                sb.AppendLine($"  DLL file exists: {(dllExists ? "YES ✓" : "NO ✘ <-- PROBLEM")}");
+                                                if (dllExists)
+                                                {
+                                                    var fi = new System.IO.FileInfo(resolvedDll);
+                                                    sb.AppendLine($"  DLL size: {fi.Length:N0} bytes | Modified: {fi.LastWriteTime:MMM dd HH:mm:ss}");
+                                                }
+                                            }
+                                        }
+                                    }
+                                    catch (Exception ex2) { sb.AppendLine($"  Error reading JSON: {ex2.Message}"); }
+                                }
+                                sb.AppendLine();
+                            }
+                        }
+                    }
+                    catch { }
+                }
+            }
+
+            if (!foundAny)
+            {
+                sb.AppendLine("NO MonoEye registration found in registry!\n");
+                sb.AppendLine("Click 'Enable' in the Switcher to register the layer first.");
+            }
+
+            // Also check the log file
+            string docsLog = System.IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+                "MonoEye", "monoeye.log");
+            sb.AppendLine($"Log file: {(System.IO.File.Exists(docsLog) ? "EXISTS ✓" : "MISSING ✘ (DLL was never loaded)")}");
+            if (System.IO.File.Exists(docsLog))
+            {
+                var fi = new System.IO.FileInfo(docsLog);
+                sb.AppendLine($"  Size: {fi.Length:N0} bytes | Modified: {fi.LastWriteTime:MMM dd HH:mm:ss}");
+            }
+
+            // Show pipe status
+            sb.AppendLine($"\nIPC Pipe status: {pipeStatusLabel.Text}");
+
+            MessageBox.Show(sb.ToString(), "Layer Diagnosis", MessageBoxButtons.OK,
+                foundAny ? MessageBoxIcon.Information : MessageBoxIcon.Error);
         }
     }
 }

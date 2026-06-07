@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 
 echo ========================================
-echo   MonoEye Installer v0.5.19
+echo   MonoEye Installer v0.5.71
 echo   Single-eye VR rendering
 echo ========================================
 echo.
@@ -49,10 +49,10 @@ if exist "XR_APILAYER_NOVENDOR_monoeye.dll" (
     echo   WARNING: XR_APILAYER_NOVENDOR_monoeye.dll not found in current directory
 )
 
-:: Copy JSON manifest
+:: Copy JSON manifest and fix path to be absolute
 if exist "XR_APILAYER_NOVENDOR_monoeye.json" (
-    copy /Y "XR_APILAYER_NOVENDOR_monoeye.json" "%INSTALL_DIR%\"
-    echo   - Manifest installed
+    powershell -Command "(Get-Content 'XR_APILAYER_NOVENDOR_monoeye.json') -replace '\.\\\XR_APILAYER_NOVENDOR_monoeye.dll', ('%INSTALL_DIR:\=\\%' + '\\\\XR_APILAYER_NOVENDOR_monoeye.dll') | Set-Content '%INSTALL_DIR%\XR_APILAYER_NOVENDOR_monoeye.json'"
+    echo   - Manifest installed (with absolute path)
 ) else (
     echo   WARNING: XR_APILAYER_NOVENDOR_monoeye.json not found in current directory
 )
@@ -83,11 +83,10 @@ del "%TEMP%\create_link.vbs"
 
 echo   - Desktop shortcut created
 
-:: Enable MonoEye by default
+:: MonoEye is now enabled by default via the API layer manifest.
+:: Use MONOEYE_DISABLE=1 to disable.
 echo.
-echo Enabling MonoEye...
-setx MONOEYE_ENABLE 1 /M >nul
-echo   - MONOEYE_ENABLE=1 set
+echo MonoEye is ENABLED by default.
 
 :: Register OpenXR API Layer in Registry
 echo Registering OpenXR API Layer...

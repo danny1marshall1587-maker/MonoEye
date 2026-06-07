@@ -1,5 +1,5 @@
 @echo off
-echo MonoEye Diagnostic Test (Simplified)
+echo MonoEye Diagnostic Test
 echo.
 echo [1] Checking Registry:
 reg query "HKLM\SOFTWARE\Khronos\OpenXR\1\ApiLayers\Implicit" /s 2>nul | findstr /i "monoeye"

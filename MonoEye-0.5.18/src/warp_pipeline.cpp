@@ -3,17 +3,21 @@
 
 #include "warp_pipeline.h"
 #include "swapchain_tracker.h"
+#include "overlay_manager.h"
 #include "logging.h"
 #include "config.h"
 
 #include "vulkan_utils.h"
 #include <cstring>
+#include <atomic>
 
 #ifdef MONOEYE_EMBED_SHADERS
 #include "depth_warp.h"
 #endif
 
 namespace monoeye {
+
+extern std::atomic<uint64_t> g_frame_count;
 
 struct WarpPushConstants {
     float ipd;
@@ -27,8 +31,10 @@ struct WarpPushConstants {
     uint32_t tensorEnabled;
     uint32_t specularRejection;
     uint32_t edgeSmoothing;
+    uint32_t frameGenEnabled;
     float upscaleFactor;
     uint32_t frameIndex;
+    uint32_t hasUIOverlay;
 };
 
 WarpPipeline::WarpPipeline() = default;
@@ -241,11 +247,14 @@ void WarpPipeline::shutdown() {
 
 VkResult WarpPipeline::create_descriptor_resources() {
     // Descriptor set layout:
+    // Binding 0: left eye color (sampled image)
+    // Binding 1: left eye depth (sampled image)
     // Binding 2: right eye output (storage image)
     // Binding 3: previous frame (storage image for accumulation)
     // Binding 4: motion vectors (sampled image)
+    // Binding 5: UI overlay (sampled image)
 
-    VkDescriptorSetLayoutBinding bindings[5] = {};
+    VkDescriptorSetLayoutBinding bindings[6] = {};
 
     bindings[0].binding = 0;
     bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
@@ -272,9 +281,14 @@ VkResult WarpPipeline::create_descriptor_resources() {
     bindings[4].descriptorCount = 1;
     bindings[4].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
+    bindings[5].binding = 5;
+    bindings[5].descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+    bindings[5].descriptorCount = 1;
+    bindings[5].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
     VkDescriptorSetLayoutCreateInfo layoutInfo = {};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 5;
+    layoutInfo.bindingCount = 6;
     layoutInfo.pBindings = bindings;
 
     VkResult result = vkCreateDescriptorSetLayout(m_vkDevice, &layoutInfo, nullptr, &m_descriptorSetLayout);
@@ -285,7 +299,7 @@ VkResult WarpPipeline::create_descriptor_resources() {
     // Create descriptor pool
     VkDescriptorPoolSize poolSizes[2] = {};
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
-    poolSizes[0].descriptorCount = 3; // Color + Depth + Motion
+    poolSizes[0].descriptorCount = 4; // Color + Depth + Motion + UI
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
     poolSizes[1].descriptorCount = 2; // Output + Temporal
 
@@ -377,7 +391,10 @@ VkResult WarpPipeline::execute_warp(
     SwapchainImageInfo* leftDepth,
     SwapchainImageInfo* leftMotion,
     SwapchainImageInfo* rightColor,
-    XrTime displayTime
+    XrTime displayTime,
+    VkSemaphore externalSemaphore,
+    uint32_t srcLayerIndex,
+    uint32_t dstLayerIndex
 ) {
     (void)displayTime; // Future: use for temporal reprojection
 
@@ -402,7 +419,7 @@ VkResult WarpPipeline::execute_warp(
         ensure_temporal_buffer(width, height);
     }
 
-    MONOEYE_LOG_DEBUG("Executing depth warp: %dx%d", width, height);
+    MONOEYE_LOG_DEBUG("Executing depth warp: %dx%d (srcLayer=%u, dstLayer=%u)", width, height, srcLayerIndex, dstLayerIndex);
 
     // Get image indices (use first available for now)
     uint32_t leftColorIdx = 0;
@@ -410,10 +427,10 @@ VkResult WarpPipeline::execute_warp(
     uint32_t leftDepthIdx = leftDepth ? 0 : 0;
 
     // Create image views
-    VkImageView leftColorView = SwapchainTracker::get_instance().get_current_view(leftColor);
-    VkImageView leftEyeDepthView = leftDepth ? SwapchainTracker::get_instance().get_current_view(leftDepth) : VK_NULL_HANDLE;
-    VkImageView leftMotionView = leftMotion ? SwapchainTracker::get_instance().get_current_view(leftMotion) : VK_NULL_HANDLE;
-    VkImageView rightColorView = SwapchainTracker::get_instance().get_current_view(rightColor);
+    VkImageView leftColorView = SwapchainTracker::get_instance().get_current_view(leftColor, srcLayerIndex);
+    VkImageView leftEyeDepthView = leftDepth ? SwapchainTracker::get_instance().get_current_view(leftDepth, srcLayerIndex) : VK_NULL_HANDLE;
+    VkImageView leftMotionView = leftMotion ? SwapchainTracker::get_instance().get_current_view(leftMotion, srcLayerIndex) : VK_NULL_HANDLE;
+    VkImageView rightColorView = SwapchainTracker::get_instance().get_current_view(rightColor, dstLayerIndex);
 
     // Use a format appropriate for the swapchain
     VkFormat colorFormat = VK_FORMAT_R8G8B8A8_SRGB; // Will be overridden based on actual format
@@ -495,8 +512,27 @@ VkResult WarpPipeline::execute_warp(
         vkUpdateDescriptorSets(m_vkDevice, 1, &motionWrite, 0, nullptr);
     }
 
+    // REQUIREMENT 6: UI Overlay Binding
+    VkImageView uiView = OverlayManager::get_instance().get_vulkan_image_view();
+    if (uiView != VK_NULL_HANDLE) {
+        VkDescriptorImageInfo uiInfo = {};
+        uiInfo.imageView = uiView;
+        uiInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        uiInfo.sampler = m_sampler;
+
+        VkWriteDescriptorSet uiWrite = {};
+        uiWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        uiWrite.dstSet = m_descriptorSet;
+        uiWrite.dstBinding = 5;
+        uiWrite.descriptorCount = 1;
+        uiWrite.descriptorType = VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE;
+        uiWrite.pImageInfo = &uiInfo;
+
+        vkUpdateDescriptorSets(m_vkDevice, 1, &uiWrite, 0, nullptr);
+    }
+
     // Record and submit the compute command
-    VkResult result = record_compute_command(leftColorView, leftEyeDepthView, leftMotionView, rightColorView, width, height);
+    VkResult result = record_compute_command(leftColorView, leftEyeDepthView, leftMotionView, rightColorView, width, height, externalSemaphore);
 
     return result;
 }
@@ -507,7 +543,8 @@ VkResult WarpPipeline::record_compute_command(
     VkImageView leftMotionView,
     VkImageView rightColorView,
     uint32_t width,
-    uint32_t height
+    uint32_t height,
+    VkSemaphore externalSemaphore
 ) {
     (void)leftColorView;
     (void)leftEyeDepthView;
@@ -545,8 +582,10 @@ VkResult WarpPipeline::record_compute_command(
     pc.tensorEnabled = (config.tensor_stabilization && m_hasTensorCores) ? 1 : 0;
     pc.specularRejection = config.specular_rejection ? 1 : 0;
     pc.edgeSmoothing = config.edge_smoothing ? 1 : 0;
+    pc.frameGenEnabled = config.frame_gen_enabled ? 1 : 0;
     pc.upscaleFactor = config.render_width_percent / 100.0f;
     pc.frameIndex = s_frame_index++;
+    pc.hasUIOverlay = OverlayManager::get_instance().is_visible() ? 1 : 0;
 
     vkCmdPushConstants(m_commandBuffer, m_pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 
         0, sizeof(WarpPushConstants), &pc);
@@ -564,13 +603,43 @@ VkResult WarpPipeline::record_compute_command(
         return result;
     }
 
-    // Submit to the queue
+    std::vector<VkSemaphore> waitSemaphores;
+    std::vector<VkPipelineStageFlags> waitStages;
+    std::vector<uint64_t> waitValues;
+
+    std::vector<VkSemaphore> signalSemaphores = {m_completionSemaphore};
+    std::vector<uint64_t> signalValues = {0};
+
+    if (externalSemaphore != VK_NULL_HANDLE) {
+        uint64_t currentFrame = g_frame_count.load(std::memory_order_relaxed) + 1;
+        uint64_t waitVal = 2 * currentFrame - 1;
+        uint64_t sigVal = 2 * currentFrame;
+
+        waitSemaphores.push_back(externalSemaphore);
+        waitStages.push_back(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT);
+        waitValues.push_back(waitVal);
+
+        signalSemaphores.push_back(externalSemaphore);
+        signalValues.push_back(sigVal);
+    }
+
+    VkTimelineSemaphoreSubmitInfo timelineInfo = {};
+    timelineInfo.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
+    timelineInfo.waitSemaphoreValueCount = (uint32_t)waitValues.size();
+    timelineInfo.pWaitSemaphoreValues = waitValues.data();
+    timelineInfo.signalSemaphoreValueCount = (uint32_t)signalValues.size();
+    timelineInfo.pSignalSemaphoreValues = signalValues.data();
+
     VkSubmitInfo submitInfo = {};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submitInfo.pNext = &timelineInfo;
+    submitInfo.waitSemaphoreCount = (uint32_t)waitSemaphores.size();
+    submitInfo.pWaitSemaphores = waitSemaphores.data();
+    submitInfo.pWaitDstStageMask = waitStages.data();
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &m_commandBuffer;
-    submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pSignalSemaphores = &m_completionSemaphore;
+    submitInfo.signalSemaphoreCount = (uint32_t)signalSemaphores.size();
+    submitInfo.pSignalSemaphores = signalSemaphores.data();
 
     // Reset fence before submit
     vkResetFences(m_vkDevice, 1, &m_fence);

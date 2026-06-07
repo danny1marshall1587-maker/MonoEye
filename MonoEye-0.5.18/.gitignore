@@ -47,3 +47,7 @@ release/
 # Temp files
 *.o
 *.log
+/external/Vulkan-Headers/
+monoeye_validation_report.txt
+powershell.bat
+

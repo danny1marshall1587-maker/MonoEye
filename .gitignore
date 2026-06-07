@@ -1,0 +1,67 @@
+# C++ Gitignore
+# Prerequisites
+*.d
+
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+*.i*86
+*.x86_64
+*.hex
+
+# Debugging/Profiling
+*.gdb
+*.pdb
+*.ilk
+*.idb
+*.exp
+
+# CMake
+CMakeLists.txt.user
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Testing/
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+_deps/
+
+# IDE / Editor specific
+.vs/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Project specific
+build/
+bin/
+install/
+out/
+powershell.bat
+

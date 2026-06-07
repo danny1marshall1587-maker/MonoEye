@@ -12,9 +12,9 @@
 namespace monoeye {
 
 extern std::mutex s_session_map_mutex;
-extern std::unordered_map<XrSession, XrInstance> s_session_map;
+extern std::unordered_map<XrSession, SessionState> s_session_map;
 
-extern "C" XrResult monoeye_xrEnumerateViewConfigurationViews(
+extern "C" XrResult XRAPI_CALL monoeye_xrEnumerateViewConfigurationViews(
     XrInstance instance,
     XrSystemId systemId,
     XrViewConfigurationType viewConfigurationType,
@@ -60,7 +60,7 @@ extern "C" XrResult monoeye_xrEnumerateViewConfigurationViews(
     return XR_SUCCESS;
 }
 
-extern "C" XrResult monoeye_xrLocateViews(
+extern "C" XrResult XRAPI_CALL monoeye_xrLocateViews(
     XrSession session,
     const XrViewLocateInfo* viewLocateInfo,
     XrViewState* viewState,
@@ -76,7 +76,7 @@ extern "C" XrResult monoeye_xrLocateViews(
         std::lock_guard<std::mutex> lock(s_session_map_mutex);
         auto it = s_session_map.find(session);
         if (it != s_session_map.end()) {
-            instance = it->second;
+            instance = it->second.instance;
         }
     }
 
@@ -111,6 +111,14 @@ extern "C" XrResult monoeye_xrLocateViews(
         if (result == XR_SUCCESS && views && viewCapacityInput >= needed) {
             for (uint32_t i = 0; i < needed; ++i) views[i] = tmpViews[i];
         }
+    }
+
+    // REQUIREMENT 4: Interaction Motion Source Failsafe
+    if (result != XR_SUCCESS && viewState) {
+        MONOEYE_LOG_WARN("xrLocateViews failsafe triggered (res=%d).", result);
+        viewState->viewStateFlags = 0;
+        if (viewCountOutput) *viewCountOutput = 0;
+        return XR_SUCCESS;
     }
 
     // Mono mode: mirror left eye pose/fov into all other views so the app

@@ -3,20 +3,8 @@
 
 #pragma once
 
-#ifdef _WIN32
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
-#endif
-
-#ifndef XR_USE_GRAPHICS_API_VULKAN
-#define XR_USE_GRAPHICS_API_VULKAN
-#endif
-
+#include "layer.h"
 #include <vulkan/vulkan.h>
-#include <openxr/openxr.h>
-#include <openxr/openxr_platform.h>
 
 #include <mutex>
 #include <vector>
@@ -50,7 +38,10 @@ public:
         SwapchainImageInfo* leftDepth,
         SwapchainImageInfo* leftMotion,
         SwapchainImageInfo* rightColor,
-        XrTime displayTime
+        XrTime displayTime,
+        VkSemaphore externalSemaphore = VK_NULL_HANDLE,
+        uint32_t srcLayerIndex = 0,
+        uint32_t dstLayerIndex = 0
     );
 
     // Wait for any pending warp operations to complete
@@ -95,7 +86,8 @@ private:
         VkImageView leftMotionView,
         VkImageView rightColorView,
         uint32_t width,
-        uint32_t height
+        uint32_t height,
+        VkSemaphore externalSemaphore
     );
     
     // Ensure temporal buffer is allocated and matches dimensions

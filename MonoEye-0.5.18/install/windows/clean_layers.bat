@@ -62,7 +62,7 @@ echo ===================================================
 echo This tool cleared the registry, but you must now:
 echo.
 echo 1. DELETE all your old "MonoEye" folders manually.
-echo 2. Extract the NEW v0.5.17 zip to a fresh folder.
+echo 2. Extract the NEW v0.5.71 zip to a fresh folder.
 echo 3. Run the Switcher from the new folder.
 echo.
 pause

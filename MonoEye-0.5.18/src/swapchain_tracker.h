@@ -3,22 +3,14 @@
 
 #pragma once
 
-#ifdef _WIN32
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#include <windows.h>
-#endif
-
-#include <vulkan/vulkan.h>
-#include <openxr/openxr.h>
-#include <openxr/openxr_platform.h>
+#include "layer.h"
 
 #include <mutex>
 #include <vector>
 #include <unordered_map>
 
 #include "dispatch_table.h"
+#include "layer.h"
 
 namespace monoeye {
 
@@ -30,7 +22,18 @@ struct SwapchainImageInfo {
     // For Vulkan, we need the actual image handles and views
     bool isVulkan;
     std::vector<VkImage> vulkanImages;
-    std::vector<VkImageView> vulkanImageViews;
+    std::vector<std::vector<VkImageView>> vulkanImageViewsPerLayer; // 2D vector for [imageIndex][layerIndex]
+    std::vector<VkDeviceMemory> vulkanMemories; // Track imported memory
+
+    // For DirectX 11/12
+    bool isD3D11;
+    bool isD3D12;
+    std::vector<void*> d3dResources;
+    std::vector<void*> intermediateResources; // Cached intermediate D3D12 resources
+    std::vector<void*> d3d12CommandAllocators; // Cached D3D12 Command Allocators
+    std::vector<void*> d3d12CommandLists;      // Cached D3D12 Command Lists
+
+    uint32_t activeIndex = 0; // Current active swapchain image index
 
     // Tracking which eye this swapchain belongs to
     bool isDepth;
@@ -53,7 +56,8 @@ public:
     void untrack_swapchain(XrSwapchain swapchain);
 
     SwapchainImageInfo* get_info(XrSwapchain swapchain);
-    VkImageView get_current_view(SwapchainImageInfo* info);
+    VkImageView get_current_view(SwapchainImageInfo* info, uint32_t layerIndex = 0);
+    void set_active_index(XrSwapchain swapchain, uint32_t index);
 
     void analyze_frame_views(
         uint32_t layerCount,
@@ -72,6 +76,13 @@ public:
 
 private:
     SwapchainTracker() = default;
+
+    void track_swapchain_locked(
+        XrSwapchain swapchain,
+        const XrSwapchainCreateInfo& createInfo,
+        uint32_t imageCount,
+        const XrSwapchainImageBaseHeader* images
+    );
 
     std::mutex m_mutex;
     std::unordered_map<XrSwapchain, SwapchainImageInfo> m_swapchains;

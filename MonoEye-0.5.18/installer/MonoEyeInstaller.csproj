@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <AssemblyName>MonoEyeSetup</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- We will embed the binaries as resources -->
+    <EmbeddedResource Include="..\build\XR_APILAYER_NOVENDOR_monoeye.dll" Link="Resources\XR_APILAYER_NOVENDOR_monoeye.dll" Condition="Exists('..\build\XR_APILAYER_NOVENDOR_monoeye.dll')" />
+    <EmbeddedResource Include="..\manifest\XR_APILAYER_NOVENDOR_monoeye.json" Link="Resources\XR_APILAYER_NOVENDOR_monoeye.json" />
+    <EmbeddedResource Include="..\switcher-output\MonoEyeSwitcher.exe" Link="Resources\MonoEyeSwitcher.exe" Condition="Exists('..\switcher-output\MonoEyeSwitcher.exe')" />
+  </ItemGroup>
+
+</Project>

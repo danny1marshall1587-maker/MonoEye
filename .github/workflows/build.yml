@@ -53,33 +53,33 @@ jobs:
           python-version: '3.12'
 
       - name: Configure CMake
-        run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DMONOEYE_STRICT_WARNINGS=OFF
+        run: cmake -S MonoEye-0.5.18 -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DMONOEYE_STRICT_WARNINGS=OFF
 
       - name: Build Layer
         run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --parallel
 
       - name: Build Switcher
-        run: dotnet publish switcher/MonoEyeSwitcher.csproj -c Release -r win-x64 -p:PublishSingleFile=true -o ${{github.workspace}}/switcher-output
+        run: dotnet publish MonoEye-0.5.18/switcher/MonoEyeSwitcher.csproj -c Release -r win-x64 -p:PublishSingleFile=true -o ${{github.workspace}}/switcher-output
 
       - name: Build Polished Installer
-        run: dotnet publish installer/MonoEyeInstaller.csproj -c Release -r win-x64 -p:PublishSingleFile=true -o ${{github.workspace}}/installer-output
+        run: dotnet publish MonoEye-0.5.18/installer/MonoEyeInstaller.csproj -c Release -r win-x64 -p:PublishSingleFile=true -o ${{github.workspace}}/installer-output
 
       - name: Package Release
         run: |
           New-Item -ItemType Directory -Force -Path release
           Copy-Item build\Release\XR_APILAYER_NOVENDOR_monoeye.dll release\
           Copy-Item build\Release\openvr_api.dll release\
-          Copy-Item manifest\XR_APILAYER_NOVENDOR_monoeye.json release\
-          Copy-Item README.md release\
-          Copy-Item LICENSE release\
+          Copy-Item MonoEye-0.5.18\manifest\XR_APILAYER_NOVENDOR_monoeye.json release\
+          Copy-Item MonoEye-0.5.18\README.md release\
+          Copy-Item MonoEye-0.5.18\LICENSE release\
           Copy-Item switcher-output\MonoEyeSwitcher.exe release\
           Copy-Item installer-output\MonoEyeSetup.exe release\
-          Copy-Item scripts\runtime_validator.py release\
-          Copy-Item install\windows\install.bat release\
-          Copy-Item install\windows\uninstall.bat release\
-          Copy-Item install\windows\clean_layers.bat release\
-          Copy-Item install\windows\monoeye_live_debugger.bat release\
-          Copy-Item monoeye_*.bat release\
+          Copy-Item MonoEye-0.5.18\scripts\runtime_validator.py release\
+          Copy-Item MonoEye-0.5.18\install\windows\install.bat release\
+          Copy-Item MonoEye-0.5.18\install\windows\uninstall.bat release\
+          Copy-Item MonoEye-0.5.18\install\windows\clean_layers.bat release\
+          Copy-Item MonoEye-0.5.18\install\windows\monoeye_live_debugger.bat release\
+          Copy-Item MonoEye-0.5.18\monoeye_*.bat release\
           Compress-Archive -Path release\* -DestinationPath MonoEye-windows-x64.zip
 
       - name: Upload Windows Artifact
@@ -127,7 +127,7 @@ jobs:
           python-version: '3.12'
 
       - name: Configure CMake
-        run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DMONOEYE_STRICT_WARNINGS=OFF
+        run: cmake -S MonoEye-0.5.18 -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DMONOEYE_STRICT_WARNINGS=OFF
 
       - name: Build
         run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --parallel
@@ -136,10 +136,10 @@ jobs:
         run: |
           mkdir -p release
           cp build/XR_APILAYER_NOVENDOR_monoeye.so release/
-          cp manifest/XR_APILAYER_NOVENDOR_monoeye.json release/
-          cp scripts/install_linux.sh release/
-          cp README.md release/
-          cp LICENSE release/
+          cp MonoEye-0.5.18/manifest/XR_APILAYER_NOVENDOR_monoeye.json release/
+          cp MonoEye-0.5.18/scripts/install_linux.sh release/
+          cp MonoEye-0.5.18/README.md release/
+          cp MonoEye-0.5.18/LICENSE release/
           cd release && zip -r ../MonoEye-linux-x64.zip *
 
       - name: Upload Linux Artifact

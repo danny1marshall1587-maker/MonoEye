@@ -62,6 +62,7 @@ Config load_config() {
     config.ipd_override = get_env_float("MONOEYE_IPD_OVERRIDE", 0.0f);
     config.render_width_percent = get_env_float("MONOEYE_RENDER_WIDTH_PERCENT", 100.0f);
     config.tensor_stabilization = get_env_bool("MONOEYE_TENSOR_STABILIZATION", false);
+    config.frame_gen_enabled = get_env_bool("MONOEYE_FRAME_GEN", false);
     config.specular_rejection = get_env_bool("MONOEYE_SPECULAR_REJECTION", true);
     config.edge_smoothing = get_env_bool("MONOEYE_EDGE_SMOOTHING", true);
 
@@ -84,6 +85,7 @@ Config load_config() {
     MONOEYE_LOG("  warp_quality: %d", config.warp_quality);
     MONOEYE_LOG("  show_indicator: %s", config.show_indicator ? "true" : "false");
     MONOEYE_LOG("  tensor_stabilization: %s", config.tensor_stabilization ? "true" : "false");
+    MONOEYE_LOG("  frame_gen_enabled: %s", config.frame_gen_enabled ? "true" : "false");
     MONOEYE_LOG("  specular_rejection: %s", config.specular_rejection ? "true" : "false");
     MONOEYE_LOG("  edge_smoothing: %s", config.edge_smoothing ? "true" : "false");
 

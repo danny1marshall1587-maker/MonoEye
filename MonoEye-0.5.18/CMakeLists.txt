@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.18)
 project(MonoEye
-    VERSION 0.5.19
+    VERSION 0.5.71
 
     DESCRIPTION "MonoEye - Single-eye VR rendering with depth-based second eye reconstruction"
     LANGUAGES CXX
@@ -137,6 +137,7 @@ add_custom_command(
 # Source files
 set(MONOEYE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/layer_negotiation.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/heartbeat.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/layer_instance.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/layer_proc_addr.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/dispatch_table.cpp
@@ -146,6 +147,8 @@ set(MONOEYE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/hooks_view.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/swapchain_tracker.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/warp_pipeline.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/graphics_manager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/vulkan_interop.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/config.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/logging.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/vulkan_utils.cpp
@@ -155,6 +158,8 @@ set(MONOEYE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui/imgui_widgets.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui/imgui_tables.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/external/imgui/imgui_impl_vulkan.cpp
+    $<$<PLATFORM_ID:Windows>:${CMAKE_CURRENT_SOURCE_DIR}/external/imgui/imgui_impl_dx11.cpp>
+    $<$<PLATFORM_ID:Windows>:${CMAKE_CURRENT_SOURCE_DIR}/external/imgui/imgui_impl_dx12.cpp>
 )
 
 # Build the API layer shared library
@@ -172,10 +177,17 @@ target_include_directories(monoeye PRIVATE
 if(WIN32)
     add_library(openvr_api SHARED 
         src/openvr_proxy/openvr_proxy.cpp
+        src/graphics_manager.cpp
+        src/vulkan_utils.cpp
         src/logging.cpp
     )
     target_include_directories(openvr_api PRIVATE external/openvr/headers)
     target_link_libraries(openvr_api PRIVATE Vulkan::Vulkan)
+    target_compile_definitions(openvr_api PRIVATE
+        $<$<PLATFORM_ID:Windows>:VK_USE_PLATFORM_WIN32_KHR>
+        $<$<PLATFORM_ID:Windows>:_CRT_SECURE_NO_WARNINGS>
+        $<$<PLATFORM_ID:Windows>:NOMINMAX>
+    )
     set_target_properties(openvr_api PROPERTIES PREFIX "") # Remove 'lib' prefix
 endif()
 
@@ -199,6 +211,9 @@ target_link_libraries(monoeye PRIVATE
 target_compile_definitions(monoeye PRIVATE
     MONOEYE_EXPORTS
     XR_USE_GRAPHICS_API_VULKAN
+    $<$<PLATFORM_ID:Windows>:XR_USE_PLATFORM_WIN32>
+    $<$<PLATFORM_ID:Windows>:XR_USE_GRAPHICS_API_D3D11>
+    $<$<PLATFORM_ID:Windows>:XR_USE_GRAPHICS_API_D3D12>
     $<$<PLATFORM_ID:Windows>:_CRT_SECURE_NO_WARNINGS>
     $<$<PLATFORM_ID:Windows>:NOMINMAX>
     $<$<PLATFORM_ID:Windows>:VK_USE_PLATFORM_WIN32_KHR>
