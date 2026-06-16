@@ -88,7 +88,7 @@ void SwapchainTracker::track_swapchain_locked(
         for (uint32_t i = 0; i < imageCount; ++i) {
             info.vulkanImages.push_back(vkImages[i].image);
             
-            uint32_t layers = createInfo.arrayLayers;
+            uint32_t layers = createInfo.arraySize;
             if (layers == 0) layers = 1;
             std::vector<VkImageView> imageLayers;
             
@@ -144,7 +144,7 @@ void SwapchainTracker::track_swapchain_locked(
                     info.vulkanMemories.push_back(vkMemory);
                     info.intermediateResources.push_back(intermediate);
 
-                    uint32_t layers = createInfo.arrayLayers;
+                    uint32_t layers = createInfo.arraySize;
                     if (layers == 0) layers = 1;
                     std::vector<VkImageView> imageLayers;
 
